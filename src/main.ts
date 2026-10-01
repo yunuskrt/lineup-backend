@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '@/app.module.js';
 import { loadEnv } from '@/config/load-env.js';
 import { formatEnvIssues } from '@/config/parse-env.js';
+import { setupDocs } from '@/docs/setup-docs.js';
 
 async function bootstrap() {
   const env = loadEnv();
@@ -14,6 +15,7 @@ async function bootstrap() {
 
   // Better Auth parses its own bodies (B10)
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+  setupDocs(app);
   await app.listen(env.data.PORT);
 }
 await bootstrap();

@@ -23,3 +23,4 @@ Not Started
 - B01 Repo & Scaffold: bodyParser off, port 8080, @/ alias, oxlint no-any
 - B02 Config Module: Zod env schema, fail-fast boot, ENV token, .env load
 - B03a Contract Schemas: 53 Zod schemas, id registry, PROTOCOL_VERSION 1
+- B03b OpenAPI & Envelope: /docs, envelope filter, fail-closed responses

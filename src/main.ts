@@ -15,7 +15,17 @@ async function bootstrap() {
 
   // Better Auth parses its own bodies (B10)
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+  // Lets SIGTERM close the database pool cleanly
+  app.enableShutdownHooks();
   setupDocs(app);
   await app.listen(env.data.PORT);
 }
-await bootstrap();
+
+try {
+  await bootstrap();
+} catch (error) {
+  // e.g. the database is unreachable at startup
+  const reason = error instanceof Error ? error.message : String(error);
+  new Logger('Bootstrap').error(`Startup failed: ${reason.trim()}`);
+  process.exitCode = 1;
+}

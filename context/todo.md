@@ -11,7 +11,7 @@ This todo file is for developer-side use.
 - [x] **Phase B01 — Repo & Scaffold**: NestJS, strict TS, eslint and prettier, `bodyParser: false` at bootstrap.
 - [x] **Phase B02 — Config Module**: Zod-validated environment schema parsed at boot, failing fast on gaps.
 - [x] **Phase B03 — Contract & OpenAPI**: Zod schema conventions, `PROTOCOL_VERSION`, Swagger doc at a fixed path.
-- [ ] **Phase B04 — Prisma & Neon**: Prisma 7 with the Neon adapter, `PrismaService`, migration workflow.
+- [x] **Phase B04 — Prisma & Neon**: Prisma 7 with the Neon adapter, `PrismaService`, migration workflow.
 - [ ] **Phase B05 — Club & Competition Schema**: competitions, seasons, clubs and club_aliases with migration.
 - [ ] **Phase B06 — Player & Alias Schema**: players and player_aliases, plus `pg_trgm` and `unaccent`.
 - [ ] **Phase B07 — Match & Lineup Schema**: matches, match_teams, match_events and lineups with migration.

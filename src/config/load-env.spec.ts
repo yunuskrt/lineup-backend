@@ -1,13 +1,22 @@
 describe('loadEnv', () => {
-  const originalPort = process.env.PORT;
+  const original = {
+    PORT: process.env.PORT,
+    DATABASE_URL: process.env.DATABASE_URL,
+  };
+
+  const restore = (key: keyof typeof original) => {
+    if (original[key] === undefined) delete process.env[key];
+    else process.env[key] = original[key];
+  };
 
   beforeEach(() => {
     vi.resetModules();
+    process.env.DATABASE_URL = 'postgresql://u:p@db.example.com/neondb';
   });
 
   afterEach(() => {
-    if (originalPort === undefined) delete process.env.PORT;
-    else process.env.PORT = originalPort;
+    restore('PORT');
+    restore('DATABASE_URL');
   });
 
   it('parses process.env once and reuses the result', async () => {

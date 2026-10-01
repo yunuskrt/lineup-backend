@@ -2,3 +2,4 @@
 context
 .claude
 *.md
+src/generated

@@ -7,5 +7,9 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.e2e-spec.ts'],
+    setupFiles: ['test/vitest.e2e.setup.ts'],
+    // Each suite opens a real connection to Neon
+    testTimeout: 20_000,
+    hookTimeout: 30_000,
   },
 });

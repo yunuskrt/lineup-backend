@@ -24,3 +24,4 @@ Not Started
 - B02 Config Module: Zod env schema, fail-fast boot, ENV token, .env load
 - B03a Contract Schemas: 53 Zod schemas, id registry, PROTOCOL_VERSION 1
 - B03b OpenAPI & Envelope: /docs, envelope filter, fail-closed responses
+- B04 Prisma & Neon: Prisma 7.10 + adapter-pg, startup probe, db:* scripts

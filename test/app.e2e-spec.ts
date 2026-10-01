@@ -5,6 +5,7 @@ import { App } from 'supertest/types.js';
 import { AppModule } from '@/app.module.js';
 import { ENV } from '@/config/config.module.js';
 import { loadEnv } from '@/config/load-env.js';
+import { PrismaService } from '@/prisma/prisma.service.js';
 
 describe('AppModule (e2e)', () => {
   let app: INestApplication<App>;
@@ -26,6 +27,14 @@ describe('AppModule (e2e)', () => {
     const env = loadEnv();
     if (!env.success) throw new Error('expected a valid test environment');
     expect(app.get(ENV)).toBe(env.data);
+  });
+
+  it('reaches the Neon dev branch through PrismaService', async () => {
+    const prisma = app.get(PrismaService);
+    const rows = await prisma.$queryRaw<
+      { database: string }[]
+    >`SELECT current_database() AS database`;
+    expect(rows).toEqual([{ database: expect.any(String) }]);
   });
 
   afterEach(async () => {

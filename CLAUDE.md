@@ -33,9 +33,9 @@ Three separate repositories, one backend:
 
 ## Commands
 
-Port is fixed so the web app (3000) and the backend (3001) run side by side.
+Port is fixed so the web app (3000) and the backend (8080) run side by side.
 
-- **Dev server**: `npm run start:dev` (http://localhost:3001)
+- **Dev server**: `npm run start:dev` (http://localhost:8080)
 - **Build**: `npm run build`
 - **Test**: `npm test`
 - **Lint**: `npm run lint`

@@ -130,7 +130,7 @@ cp $WEB/context/README.md  context/
 
    Phase IDs use the `B` prefix. Line order is build order; the current phase is the first `- [ ]` line.
 
-   Workflow per phase: `/todo current` → `/todo spec` → `/feature load <spec>` → `/feature start` → `/feature review` → `/feature test` → `/feature complete`.
+   Workflow per phase: `/todo current` → `/todo spec` → `/feature load <spec>` → `/feature start` → `/feature review` → `/feature test` → `/todo done` → `/feature complete`.
 
    This todo file is for developer-side use.
    ```
@@ -213,9 +213,9 @@ Three separate repositories, one backend:
 
 ## Commands
 
-Port is fixed so the web app (3000) and the backend (3001) run side by side.
+Port is fixed so the web app (3000) and the backend (8080) run side by side.
 
-- **Dev server**: `npm run start:dev` (http://localhost:3001)
+- **Dev server**: `npm run start:dev` (http://localhost:8080)
 - **Build**: `npm run build`
 - **Test**: `npm test`
 - **Lint**: `npm run lint`
@@ -373,6 +373,7 @@ Repeat this for every phase, exactly as in `lineup-web`:
 | `/feature start` | Creates `feature/<name>` and implements. |
 | `/feature review` | Checks goals, code quality and scope. |
 | `/feature test` | Adds unit tests where there is real logic. |
+| `/todo done` | Marks the current todo phase as completed. |
 | `/feature complete` | Commits (after you approve), merges to `main`, deletes the branch and pushes. It asks to tick the phase in `todo.md` in the same commit. |
 
 **How a backend phase proves it works** (`ai-interaction.md` § Workflow, step 4):
@@ -387,7 +388,7 @@ Repeat this for every phase, exactly as in `lineup-web`:
 
 `/todo spec` writes B01. Make sure its spec decides these, because every later phase builds on them:
 
-1. **Port 3001.** Read from `PORT`, defaulting to 3001.
+1. **Port 8080.** Read from `PORT`, defaulting to 8080.
 2. **`bodyParser: false`** in `NestFactory.create`. Better Auth (B10) needs it.
 3. **The `@/` import alias.** ESM with `nodenext` won't resolve `@/` at runtime by itself. Choose one: the SWC builder with `paths` in `.swcrc`, or `tsc-alias` after `tsc`. Vitest needs the same alias.
 4. **Lint tool.** `todo.md` says "eslint", but Nest 12 ships **oxlint**. Keep oxlint, or swap to ESLint, and record the choice.

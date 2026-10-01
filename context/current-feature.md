@@ -19,3 +19,5 @@ Not Started
 ## History
 
 <!-- Keep this updated. Earliest to latest -->
+
+- B01 Repo & Scaffold: bodyParser off, port 8080, @/ alias, oxlint no-any

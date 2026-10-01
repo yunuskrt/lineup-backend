@@ -21,4 +21,4 @@ Read on demand:
 - `fixes/` - Fix spec files used with `/feature load`, shaped like `features/`. They correct or reshape work already built, outside the `todo.md` phases
 - `research/` - Research files used with the `/research` command to generate documentation; created the first time `/research` runs
 
-Workflow per phase: `/todo current` → `/todo spec` → `/feature load <spec>` → `/feature start` → `/feature review` → `/feature test` → `/feature complete`.
+Workflow per phase: `/todo current` → `/todo spec` → `/feature load <spec>` → `/feature start` → `/feature review` → `/feature test` → `/todo done` → `/feature complete`.

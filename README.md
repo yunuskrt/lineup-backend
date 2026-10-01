@@ -16,7 +16,7 @@ npm install
 
 | Command              | What it does                                 |
 | -------------------- | -------------------------------------------- |
-| `npm run start:dev`  | Dev server in watch mode on port 3001        |
+| `npm run start:dev`  | Dev server in watch mode on port 8080        |
 | `npm run build`      | Compile to `dist/`                           |
 | `npm run start:prod` | Run the compiled build                       |
 | `npm test`           | Unit tests (Vitest, `*.spec.ts`)             |

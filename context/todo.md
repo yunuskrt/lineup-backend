@@ -2,13 +2,13 @@
 
 Phase IDs use the `B` prefix. Line order is build order; the current phase is the first `- [ ]` line.
 
-Workflow per phase: `/todo current` → `/todo spec` → `/feature load <spec>` → `/feature start` → `/feature review` → `/feature test` → `/feature complete`.
+Workflow per phase: `/todo current` → `/todo spec` → `/feature load <spec>` → `/feature start` → `/feature review` → `/feature test` → `/todo done` → `/feature complete`.
 
 This todo file is for developer-side use.
 
 ## Backend (NestJS)
 
-- [ ] **Phase B01 — Repo & Scaffold**: NestJS, strict TS, eslint and prettier, `bodyParser: false` at bootstrap.
+- [x] **Phase B01 — Repo & Scaffold**: NestJS, strict TS, eslint and prettier, `bodyParser: false` at bootstrap.
 - [ ] **Phase B02 — Config Module**: Zod-validated environment schema parsed at boot, failing fast on gaps.
 - [ ] **Phase B03 — Contract & OpenAPI**: Zod schema conventions, `PROTOCOL_VERSION`, Swagger doc at a fixed path.
 - [ ] **Phase B04 — Prisma & Neon**: Prisma 7 with the Neon adapter, `PrismaService`, migration workflow.

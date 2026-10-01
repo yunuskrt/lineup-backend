@@ -21,3 +21,4 @@ Not Started
 <!-- Keep this updated. Earliest to latest -->
 
 - B01 Repo & Scaffold: bodyParser off, port 8080, @/ alias, oxlint no-any
+- B02 Config Module: Zod env schema, fail-fast boot, ENV token, .env load

@@ -11,7 +11,7 @@ describe('PrismaService', () => {
   let service: PrismaService;
 
   beforeEach(() => {
-    // The pg pool connects lazily, so nothing reaches the network here
+    // The pg pool is lazy: no network here
     service = new PrismaService(env);
   });
 

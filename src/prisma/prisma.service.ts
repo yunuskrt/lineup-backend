@@ -28,7 +28,7 @@ export class PrismaService
     });
   }
 
-  // $connect() alone opens nothing with a driver adapter
+  // With an adapter, $connect() opens nothing
   async onModuleInit(): Promise<void> {
     await this.$connect();
     await this.$queryRaw`SELECT 1`;

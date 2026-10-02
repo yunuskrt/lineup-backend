@@ -44,7 +44,7 @@ const FROM_HTTP_STATUS: Partial<
   [HttpStatus.NOT_FOUND]: { code: 'not_found', message: 'Not found.' },
 };
 
-// Other 4xx stay the client's fault; 429 waits for B35
+// Other 4xx are client errors; 429 is B35's
 function clientError(status: number) {
   const isClientError = status >= 400 && status < 500;
   if (!isClientError || status === HttpStatus.TOO_MANY_REQUESTS) return null;

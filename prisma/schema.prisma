@@ -84,3 +84,33 @@ model ClubAlias {
   @@unique([clubId, alias])
   @@map("club_aliases")
 }
+
+model Player {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  slug      String   @unique
+  // Display form, diacritics kept
+  name      String
+  // Bucket object key, never a URL (B23)
+  imageKey  String?  @map("image_key")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  aliases PlayerAlias[]
+
+  @@map("players")
+}
+
+// Matching reads `normalized` only; `alias` is as written
+model PlayerAlias {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  playerId   String   @map("player_id") @db.Uuid
+  alias      String
+  normalized String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, normalized])
+  @@map("player_aliases")
+}

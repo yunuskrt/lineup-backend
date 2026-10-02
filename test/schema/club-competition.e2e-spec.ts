@@ -1,52 +1,11 @@
-import { Test } from '@nestjs/testing';
-import { ConfigModule } from '@/config/config.module.js';
-import type { Prisma } from '@/generated/prisma/client.js';
-import { PrismaModule } from '@/prisma/prisma.module.js';
-import { PrismaService } from '@/prisma/prisma.service.js';
-
-class Rollback extends Error {}
-
-// P2002 = unique violation, P2003 = foreign-key violation
-const violation = (code: 'P2002' | 'P2003', constraint: string) => ({
-  code,
-  meta: {
-    driverAdapterError: { cause: { constraint: { index: constraint } } },
-  },
-});
-
-type Tx = Prisma.TransactionClient;
+import {
+  type Tx,
+  useRolledBackDb,
+  violation,
+} from '@test/schema/schema-test-utils.js';
 
 describe('Club & competition schema (e2e)', () => {
-  let prisma: PrismaService;
-
-  beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule, PrismaModule],
-    }).compile();
-    await moduleRef.init();
-    prisma = moduleRef.get(PrismaService);
-  });
-
-  afterAll(async () => {
-    await prisma.$disconnect();
-  });
-
-  // Every case runs in its own transaction, always rolled back
-  async function rolledBack<T>(work: (tx: Tx) => Promise<T>): Promise<T> {
-    let result: T | undefined;
-    try {
-      await prisma.$transaction(
-        async (tx) => {
-          result = await work(tx);
-          throw new Rollback();
-        },
-        { timeout: 15_000 },
-      );
-    } catch (error) {
-      if (!(error instanceof Rollback)) throw error;
-    }
-    return result as T;
-  }
+  const { rolledBack, prisma } = useRolledBackDb();
 
   const competition = (tx: Tx, slug = 'test-crown-league') =>
     tx.competition.create({
@@ -114,7 +73,7 @@ describe('Club & competition schema (e2e)', () => {
   });
 
   it('leaves no rows behind', async () => {
-    const leftovers = await prisma.club.count({
+    const leftovers = await prisma().club.count({
       where: { slug: { startsWith: 'test-' } },
     });
     expect(leftovers).toBe(0);

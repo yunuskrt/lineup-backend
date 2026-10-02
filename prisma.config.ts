@@ -7,6 +7,6 @@ if (existsSync('.env')) process.loadEnvFile('.env');
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: { path: 'prisma/migrations' },
-  // Unset during `generate` on a fresh clone; that's fine
+  // May be unset for `generate` on a fresh clone
   datasource: { url: process.env.DATABASE_URL },
 });

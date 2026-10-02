@@ -26,3 +26,4 @@ Not Started
 - B03b OpenAPI & Envelope: /docs, envelope filter, fail-closed responses
 - B04 Prisma & Neon: Prisma 7.10 + adapter-pg, startup probe, db:* scripts
 - B05 Club & Competition Schema: 4 tables, first migration, 7 CHECKs
+- B06 Player & Alias Schema: raw+normalized aliases, pg_trgm, unaccent

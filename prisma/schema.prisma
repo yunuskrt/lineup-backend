@@ -9,3 +9,78 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// Values match CompetitionKind in src/contract/common.ts
+enum CompetitionKind {
+  league
+  ucl
+  uel
+  world_cup
+  euro
+
+  @@map("competition_kind")
+}
+
+enum ClubKind {
+  club
+  national_team
+
+  @@map("club_kind")
+}
+
+model Competition {
+  id        String          @id @default(uuid(7)) @db.Uuid
+  slug      String          @unique
+  kind      CompetitionKind
+  name      String
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  seasons Season[]
+
+  @@map("competitions")
+}
+
+// CHECK constraints on label/start_year live in the migration SQL
+model Season {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  competitionId String   @map("competition_id") @db.Uuid
+  label         String
+  startYear     Int      @map("start_year")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+
+  @@unique([competitionId, label])
+  @@map("seasons")
+}
+
+model Club {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  slug      String   @unique
+  kind      ClubKind
+  name      String
+  shortName String   @map("short_name")
+  // Bucket object key, never a URL (B23)
+  crestKey  String?  @map("crest_key")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  aliases ClubAlias[]
+
+  @@map("clubs")
+}
+
+model ClubAlias {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  clubId    String   @map("club_id") @db.Uuid
+  alias     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, alias])
+  @@map("club_aliases")
+}

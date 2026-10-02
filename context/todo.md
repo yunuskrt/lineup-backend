@@ -12,7 +12,7 @@ This todo file is for developer-side use.
 - [x] **Phase B02 — Config Module**: Zod-validated environment schema parsed at boot, failing fast on gaps.
 - [x] **Phase B03 — Contract & OpenAPI**: Zod schema conventions, `PROTOCOL_VERSION`, Swagger doc at a fixed path.
 - [x] **Phase B04 — Prisma & Neon**: Prisma 7 with the Neon adapter, `PrismaService`, migration workflow.
-- [ ] **Phase B05 — Club & Competition Schema**: competitions, seasons, clubs and club_aliases with migration.
+- [x] **Phase B05 — Club & Competition Schema**: competitions, seasons, clubs and club_aliases with migration.
 - [ ] **Phase B06 — Player & Alias Schema**: players and player_aliases, plus `pg_trgm` and `unaccent`.
 - [ ] **Phase B07 — Match & Lineup Schema**: matches, match_teams, match_events and lineups with migration.
 - [ ] **Phase B08 — Scoring & Session Schema**: memorability_scores, game_sessions, game_rounds, guesses, stats.

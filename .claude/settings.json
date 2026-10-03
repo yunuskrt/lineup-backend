@@ -8,7 +8,10 @@
       "Bash(echo \"lint exit=$?\")",
       "Bash(awk -F// '{ c=$NF; if \\(length\\(c\\) > 51\\) print \"LONG:\", $0 }')",
       "Bash(npx tsc *)",
-      "Bash(npm test *)"
+      "Bash(npm test *)",
+      "mcp__claude_ai_Context7__resolve-library-id",
+      "Bash(npm view *)",
+      "Bash(grep -v -i 'sslmode\\\\|libpq\\\\|trace-warn\\\\|To prepare\\\\|^$')"
     ]
   }
 }

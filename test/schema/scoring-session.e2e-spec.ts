@@ -1,5 +1,9 @@
 import type { GameMode, Prisma } from '@/generated/prisma/client.js';
-import { type Built, buildMatch } from '@test/schema/schema-fixtures.js';
+import {
+  type Built,
+  buildMatch,
+  buildUsers,
+} from '@test/schema/schema-fixtures.js';
 import {
   type Tx,
   useRolledBackDb,
@@ -12,6 +16,7 @@ const at = (seconds: number) => new Date(T0.getTime() + seconds * 1000);
 // A session on a fresh match, one or two players
 async function startSession(tx: Tx, mode: GameMode) {
   const built = await buildMatch(tx);
+  const users = await buildUsers(tx, mode === 'solo' ? 1 : 2);
   const session = await tx.gameSession.create({
     data: {
       mode,
@@ -19,13 +24,7 @@ async function startSession(tx: Tx, mode: GameMode) {
       side: 'home',
       startedAt: T0,
       participants: {
-        create:
-          mode === 'solo'
-            ? [{ userId: 'test-user-a', seat: 0 }]
-            : [
-                { userId: 'test-user-a', seat: 0 },
-                { userId: 'test-user-b', seat: 1 },
-              ],
+        create: users.map((user, seat) => ({ userId: user.id, seat })),
       },
     },
     include: { participants: { orderBy: { seat: 'asc' } } },
@@ -106,7 +105,7 @@ describe('Scoring & session schema (e2e)', () => {
       return tx.gameSession.findUniqueOrThrow({
         where: { id: session.id },
         include: {
-          participants: true,
+          participants: { include: { user: true } },
           rounds: {
             orderBy: { number: 'asc' },
             include: { guesses: { orderBy: { receivedAt: 'asc' } } },
@@ -120,7 +119,9 @@ describe('Scoring & session schema (e2e)', () => {
       status: 'over',
       side: 'home',
       soloEndReason: 'quit',
-      participants: [{ userId: 'test-user-a', seat: 0, livesRemaining: 3 }],
+      participants: [
+        { seat: 0, livesRemaining: 3, user: { handle: 'test-user-a' } },
+      ],
     });
     expect(read.rounds.map((r) => [r.number, r.endReason])).toEqual([
       [1, 'found'],
@@ -163,7 +164,7 @@ describe('Scoring & session schema (e2e)', () => {
       return tx.gameSession.findUniqueOrThrow({
         where: { id: started.session.id },
         include: {
-          participants: { orderBy: { seat: 'asc' } },
+          participants: { orderBy: { seat: 'asc' }, include: { user: true } },
           rounds: {
             orderBy: { number: 'asc' },
             include: { participant: true },
@@ -174,7 +175,11 @@ describe('Scoring & session schema (e2e)', () => {
 
     expect(read.soloEndReason).toBeNull();
     expect(
-      read.participants.map((p) => [p.userId, p.livesRemaining, p.duelOutcome]),
+      read.participants.map((p) => [
+        p.user.handle,
+        p.livesRemaining,
+        p.duelOutcome,
+      ]),
     ).toEqual([
       ['test-user-a', 0, 'loss'],
       ['test-user-b', 3, 'win'],
@@ -183,8 +188,9 @@ describe('Scoring & session schema (e2e)', () => {
   });
 
   it('leaves no rows behind', async () => {
-    const leftovers = await prisma().gameParticipant.count({
-      where: { userId: { startsWith: 'test-' } },
+    // buildUsers' prefix; the auth suite commits others
+    const leftovers = await prisma().user.count({
+      where: { email: { startsWith: 'test-user-' } },
     });
     expect(leftovers).toBe(0);
   });
@@ -358,7 +364,7 @@ describe('Scoring & session schema (e2e)', () => {
         withSession('duel', (tx, { seats }) =>
           tx.gameParticipant.update({
             where: { id: seats[1].id },
-            data: { userId: 'test-user-a' },
+            data: { userId: seats[0].userId },
           }),
         ),
       ).rejects.toMatchObject(
@@ -478,9 +484,10 @@ describe('Scoring & session schema (e2e)', () => {
 
   describe('user_stats', () => {
     const stats = (data: Partial<Prisma.UserStatsUncheckedCreateInput>) =>
-      rolledBack((tx) =>
-        tx.userStats.create({ data: { userId: 'test-user-a', ...data } }),
-      );
+      rolledBack(async (tx) => {
+        const [user] = await buildUsers(tx, 1);
+        return tx.userStats.create({ data: { userId: user.id, ...data } });
+      });
 
     it('accepts a best streak of 11', async () => {
       const created = await stats({ bestStreak: 11 });
@@ -534,12 +541,13 @@ describe('Scoring & session schema (e2e)', () => {
             shortName: 'FAV',
           },
         });
+        const [user] = await buildUsers(tx, 1);
         await tx.userStats.create({
-          data: { userId: 'test-user-a', favouriteClubId: club.id },
+          data: { userId: user.id, favouriteClubId: club.id },
         });
         await tx.club.delete({ where: { id: club.id } });
         return tx.userStats.findUniqueOrThrow({
-          where: { userId: 'test-user-a' },
+          where: { userId: user.id },
         });
       });
       expect(after.favouriteClubId).toBeNull();

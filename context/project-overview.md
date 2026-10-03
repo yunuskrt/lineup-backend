@@ -109,7 +109,7 @@ Underestimating this will sink the game. "Ibrahimovic", "Zlatan", "İbrahimović
 
 - **Guest play is first-class** — no signup wall in front of the first game, including duels.
 - A guest is a real, persisted anonymous identity bound to a device, upgradeable to a full account **without losing history**. This is one migration path, not two account systems.
-- Auth methods: email + password, Apple Sign-In (mandatory for App Store if any social login exists), Google.
+- Auth methods: **email + password** and **continue as guest**. No social sign-in (Google, Apple) — no third-party account, and App Store Guideline 4.8 does not apply to an app that only uses its own accounts.
 - Stored per user: match history, win / loss / draw, accuracy, favourite-club stats, best streaks, perfect clears.
 
 ### G) Cross-Platform Parity & Anti-Cheat

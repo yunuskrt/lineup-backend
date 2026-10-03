@@ -32,11 +32,13 @@ const passwordSchema = z
   .min(MIN_PASSWORD_LENGTH)
   .max(MAX_PASSWORD_LENGTH);
 
-const handleSchema = z
+// Same rule as the users_handle_check constraint
+export const handleSchema = z
   .string()
   .trim()
   .min(MIN_HANDLE_LENGTH)
-  .max(MAX_HANDLE_LENGTH);
+  .max(MAX_HANDLE_LENGTH)
+  .regex(/^[A-Za-z0-9_.-]+$/, 'Letters, digits, _ . - only');
 
 export const signInRequestSchema = z
   .object({

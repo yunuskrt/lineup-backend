@@ -13,7 +13,7 @@ async function bootstrap() {
     return;
   }
 
-  // Better Auth parses its own bodies (B10)
+  // AuthModule parses bodies, skipping /api/auth
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   // Lets SIGTERM close the database pool cleanly
   app.enableShutdownHooks();

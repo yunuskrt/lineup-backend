@@ -32,9 +32,22 @@ describe('signUpRequestSchema', () => {
     ).toBe('abc');
   });
 
+  it.each(['Ist_05', 'a.b-c', 'x'.repeat(24)])(
+    'accepts the handle %j',
+    (handle) => {
+      expect(signUpRequestSchema.safeParse({ ...signUp, handle }).success).toBe(
+        true,
+      );
+    },
+  );
+
   it.each([
     ['short', '  ab  '],
     ['long', 'x'.repeat(25)],
+    ['spaced', 'ist 05'],
+    ['accented', 'İstanbul'],
+    ['emoji', 'fan⚽'],
+    ['symbol', 'fan@lineup'],
   ])('rejects a %s handle', (_, handle) => {
     expect(signUpRequestSchema.safeParse({ ...signUp, handle }).success).toBe(
       false,

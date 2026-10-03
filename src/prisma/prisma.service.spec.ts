@@ -5,6 +5,8 @@ const env: Env = {
   NODE_ENV: 'test',
   PORT: 8080,
   DATABASE_URL: 'postgresql://u:p@db.example.com/neondb',
+  BETTER_AUTH_SECRET: 'k'.repeat(32),
+  BETTER_AUTH_URL: 'http://localhost:8080',
 };
 
 describe('PrismaService', () => {

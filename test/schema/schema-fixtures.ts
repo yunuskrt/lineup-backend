@@ -10,6 +10,20 @@ export const POSITIONS_442: PositionGroup[] = [
 
 export type Built = Awaited<ReturnType<typeof buildMatch>>;
 
+// Users a, b, … with test- emails and handles
+export function buildUsers(tx: Tx, count: number) {
+  const tags = Array.from({ length: count }, (_, i) =>
+    String.fromCharCode(97 + i),
+  );
+  return tx.user.createManyAndReturn({
+    data: tags.map((tag) => ({
+      name: `test-user-${tag}`,
+      handle: `test-user-${tag}`,
+      email: `test-user-${tag}@lineup.test`,
+    })),
+  });
+}
+
 // A full fixture: season, two clubs, two XIs of 11
 export async function buildMatch(tx: Tx, slug = 'test-mudbath-derby') {
   const competition = await tx.competition.create({

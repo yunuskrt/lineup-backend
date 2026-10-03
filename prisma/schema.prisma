@@ -322,8 +322,7 @@ model GameSession {
 model GameParticipant {
   id             String       @id @default(uuid(7)) @db.Uuid
   sessionId      String       @map("session_id") @db.Uuid
-  // Better Auth user id; FK added in B10
-  userId         String       @map("user_id")
+  userId         String       @map("user_id") @db.Uuid
   seat           Int
   livesRemaining Int          @default(3) @map("lives_remaining")
   duelOutcome    DuelOutcome? @map("duel_outcome")
@@ -331,6 +330,8 @@ model GameParticipant {
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
   session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  // Restrict: history outlives a careless delete
+  user    User        @relation(fields: [userId], references: [id], onDelete: Restrict)
   rounds  GameRound[]
 
   @@unique([sessionId, seat])
@@ -382,8 +383,7 @@ model Guess {
 }
 
 model UserStats {
-  // Better Auth user id; FK added in B10
-  userId          String   @id @map("user_id")
+  userId          String   @id @map("user_id") @db.Uuid
   played          Int      @default(0)
   wins            Int      @default(0)
   losses          Int      @default(0)
@@ -396,8 +396,81 @@ model UserStats {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
+  user          User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   favouriteClub Club? @relation(fields: [favouriteClubId], references: [id], onDelete: SetNull)
 
   @@index([favouriteClubId])
   @@map("user_stats")
+}
+
+// Better Auth models; field names are its own
+model User {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  // Display name; Better Auth requires it
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false) @map("email_verified")
+  image         String?
+  // Unique on lower(handle), in migration SQL
+  handle        String
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  sessions     Session[]
+  accounts     Account[]
+  participants GameParticipant[]
+  stats        UserStats?
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_sessions")
+}
+
+// One credential row per email/password user
+model Account {
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  // A hash, never the password
+  password              String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_accounts")
+}
+
+model Verification {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([identifier])
+  @@map("auth_verifications")
 }

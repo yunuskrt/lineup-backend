@@ -1,13 +1,15 @@
 import { formatEnvIssues, parseEnv } from '@/config/parse-env.js';
 
 const DATABASE_URL = 'postgresql://lineup:secret@db.example.com/neondb';
-const base = { DATABASE_URL };
+const BETTER_AUTH_SECRET = 'k'.repeat(32);
+const BETTER_AUTH_URL = 'http://localhost:8080';
+const base = { DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL };
 
 describe('parseEnv', () => {
   it('applies defaults when optional keys are unset', () => {
     expect(parseEnv(base)).toEqual({
       success: true,
-      data: { NODE_ENV: 'development', PORT: 8080, DATABASE_URL },
+      data: { NODE_ENV: 'development', PORT: 8080, ...base },
     });
   });
 
@@ -15,7 +17,7 @@ describe('parseEnv', () => {
     const result = parseEnv({ ...base, PORT: '8090', NODE_ENV: 'production' });
     expect(result).toEqual({
       success: true,
-      data: { NODE_ENV: 'production', PORT: 8090, DATABASE_URL },
+      data: { NODE_ENV: 'production', PORT: 8090, ...base },
     });
   });
 
@@ -47,7 +49,7 @@ describe('parseEnv', () => {
 
   it('accepts both postgres URL schemes', () => {
     for (const url of [DATABASE_URL, 'postgres://u:p@localhost:5432/db']) {
-      expect(parseEnv({ DATABASE_URL: url }).success).toBe(true);
+      expect(parseEnv({ ...base, DATABASE_URL: url }).success).toBe(true);
     }
   });
 
@@ -57,7 +59,7 @@ describe('parseEnv', () => {
     ['not a URL', 'neondb'],
     ['another scheme', 'mysql://u:p@localhost/db'],
   ])('rejects a %s DATABASE_URL', (_, url) => {
-    const result = parseEnv({ DATABASE_URL: url });
+    const result = parseEnv({ ...base, DATABASE_URL: url });
     expect(!result.success && result.error.map((i) => i.key)).toEqual([
       'DATABASE_URL',
     ]);
@@ -69,6 +71,29 @@ describe('parseEnv', () => {
       'NODE_ENV',
       'PORT',
       'DATABASE_URL',
+      'BETTER_AUTH_SECRET',
+      'BETTER_AUTH_URL',
+    ]);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['31 characters', 'k'.repeat(31)],
+  ])('rejects a %s BETTER_AUTH_SECRET', (_, secret) => {
+    const result = parseEnv({ ...base, BETTER_AUTH_SECRET: secret });
+    expect(!result.success && result.error.map((i) => i.key)).toEqual([
+      'BETTER_AUTH_SECRET',
+    ]);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['not a URL', 'localhost:8080'],
+    ['another scheme', 'ftp://localhost'],
+  ])('rejects a %s BETTER_AUTH_URL', (_, url) => {
+    const result = parseEnv({ ...base, BETTER_AUTH_URL: url });
+    expect(!result.success && result.error.map((i) => i.key)).toEqual([
+      'BETTER_AUTH_URL',
     ]);
   });
 
@@ -77,6 +102,7 @@ describe('parseEnv', () => {
       NODE_ENV: 'hunter2-secret',
       PORT: 'leaked-token-9f3a',
       DATABASE_URL: 'mysql://admin:s3cr3t-pw@db.internal/prod',
+      BETTER_AUTH_SECRET: 'short-auth-secret-x9',
     };
     const result = parseEnv(values);
     if (result.success) throw new Error('expected failure');
@@ -86,5 +112,6 @@ describe('parseEnv', () => {
     expect(output).not.toContain(values.PORT);
     expect(output).not.toContain('s3cr3t-pw');
     expect(output).not.toContain('db.internal');
+    expect(output).not.toContain(values.BETTER_AUTH_SECRET);
   });
 });

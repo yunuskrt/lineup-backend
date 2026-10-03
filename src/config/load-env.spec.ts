@@ -1,22 +1,24 @@
-describe('loadEnv', () => {
-  const original = {
-    PORT: process.env.PORT,
-    DATABASE_URL: process.env.DATABASE_URL,
-  };
+const REQUIRED = {
+  DATABASE_URL: 'postgresql://u:p@db.example.com/neondb',
+  BETTER_AUTH_SECRET: 'a'.repeat(32),
+  BETTER_AUTH_URL: 'http://localhost:8080',
+};
+type Key = keyof typeof REQUIRED | 'PORT';
+const KEYS: Key[] = ['PORT', ...(Object.keys(REQUIRED) as Key[])];
 
-  const restore = (key: keyof typeof original) => {
-    if (original[key] === undefined) delete process.env[key];
-    else process.env[key] = original[key];
-  };
+describe('loadEnv', () => {
+  const original = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 
   beforeEach(() => {
     vi.resetModules();
-    process.env.DATABASE_URL = 'postgresql://u:p@db.example.com/neondb';
+    Object.assign(process.env, REQUIRED);
   });
 
   afterEach(() => {
-    restore('PORT');
-    restore('DATABASE_URL');
+    for (const key of KEYS) {
+      if (original[key] === undefined) delete process.env[key];
+      else process.env[key] = original[key];
+    }
   });
 
   it('parses process.env once and reuses the result', async () => {

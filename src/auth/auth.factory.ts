@@ -37,6 +37,10 @@ export function createAuth(prisma: PrismaService, env: Env) {
       // Prisma fills uuid(7) ids, as on every table
       database: { generateId: false },
     },
+    // Clients use /auth/*, which applies the handle rules
+    disabledPaths: ['/sign-up/email', '/sign-in/email'],
+    // Its info logs carry emails
+    logger: { level: 'warn' },
     telemetry: { enabled: false },
   });
 }

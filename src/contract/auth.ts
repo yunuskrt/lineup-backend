@@ -24,6 +24,11 @@ export const sessionSchema = z
   .register(contractRegistry, { id: 'Session' });
 export type Session = z.infer<typeof sessionSchema>;
 
+// GET /auth/session: null when signed out
+export const sessionOrNullSchema = sessionSchema
+  .nullable()
+  .register(contractRegistry, { id: 'SessionOrNull' });
+
 const emailSchema = z.email();
 
 // Length only; B10 owns the password policy

@@ -31,3 +31,4 @@ Not Started
 - B08 Scoring & Session Schema: 6 tables, 2 migrations, 17 CHECKs
 - B09 Seed Script: web mock fixtures, idempotent diff-sync, db:seed
 - B10a Better Auth Core: auth tables, uuid(7) users, handle rule, user FKs
+- B10b Auth Endpoints: /auth session, sign-up/in/out, cookies, safe errors

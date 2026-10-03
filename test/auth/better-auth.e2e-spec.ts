@@ -12,8 +12,9 @@ import { useRolledBackDb, violation } from '@test/schema/schema-test-utils.js';
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-/;
 const PASSWORD = 'correct-horse';
 
-const signUp = (tag: string, handle: string = `test-${tag}`) => ({
-  email: `test-${tag}@lineup.test`,
+// Own prefix: e2e files run in parallel
+const signUp = (tag: string, handle: string = `test-c-${tag}`) => ({
+  email: `test-core-${tag}@lineup.test`,
   password: PASSWORD,
   name: handle,
   handle,
@@ -37,7 +38,7 @@ describe('Better Auth (e2e)', () => {
   // Sign-ups commit for real; their rows go here
   afterEach(async () => {
     await prisma.user.deleteMany({
-      where: { email: { startsWith: 'test-', endsWith: '@lineup.test' } },
+      where: { email: { startsWith: 'test-core-' } },
     });
   });
 
@@ -55,8 +56,8 @@ describe('Better Auth (e2e)', () => {
       });
       expect(stored.id).toMatch(UUID_V7);
       expect(stored).toMatchObject({
-        email: 'test-ada@lineup.test',
-        handle: 'test-ada',
+        email: 'test-core-ada@lineup.test',
+        handle: 'test-c-ada',
         emailVerified: false,
       });
       expect(stored.accounts).toHaveLength(1);
@@ -66,8 +67,8 @@ describe('Better Auth (e2e)', () => {
 
     it('stores the trimmed handle and a lowercase email', async () => {
       const body = {
-        ...signUp('case', '  test-pad  '),
-        email: 'Test-Case@Lineup.TEST',
+        ...signUp('case', '  test-c-pad  '),
+        email: 'Test-Core-Case@Lineup.TEST',
       };
       const { user } = await auth.api.signUpEmail({ body });
 
@@ -75,8 +76,8 @@ describe('Better Auth (e2e)', () => {
         where: { id: user.id },
       });
       expect([stored.handle, stored.email]).toEqual([
-        'test-pad',
-        'test-case@lineup.test',
+        'test-c-pad',
+        'test-core-case@lineup.test',
       ]);
     });
 
@@ -102,13 +103,13 @@ describe('Better Auth (e2e)', () => {
     );
 
     it('refuses a handle taken in another case', async () => {
-      await auth.api.signUpEmail({ body: signUp('first', 'test-Dup') });
+      await auth.api.signUpEmail({ body: signUp('first', 'test-c-Dup') });
       await expect(
-        auth.api.signUpEmail({ body: signUp('second', 'TEST-dup') }),
+        auth.api.signUpEmail({ body: signUp('second', 'TEST-C-dup') }),
       ).rejects.toThrow();
       expect(
         await prisma.user.count({
-          where: { email: 'test-second@lineup.test' },
+          where: { email: 'test-core-second@lineup.test' },
         }),
       ).toBe(0);
     });
@@ -121,15 +122,14 @@ describe('Better Auth (e2e)', () => {
       expect(res.body).toEqual({ ok: true });
     });
 
-    it('sets a lineup-prefixed, HttpOnly session cookie', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/auth/sign-up/email')
-        .send(signUp('cookie'));
-      expect(res.status).toBe(200);
-      const cookies = [res.headers['set-cookie'] ?? []].flat();
-      const session = cookies.find((c) =>
-        c.startsWith('lineup.session_token='),
-      );
+    it('issues a lineup-prefixed, HttpOnly session cookie', async () => {
+      const { headers } = await auth.api.signUpEmail({
+        body: signUp('cookie'),
+        returnHeaders: true,
+      });
+      const session = headers
+        .getSetCookie()
+        .find((c) => c.startsWith('lineup.session_token='));
       expect(session).toMatch(/HttpOnly/i);
     });
 

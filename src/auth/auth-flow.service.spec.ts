@@ -1,0 +1,260 @@
+import { Logger } from '@nestjs/common';
+import type { AuthService } from '@thallesp/nestjs-better-auth';
+import { APIError } from 'better-auth/api';
+import {
+  AuthFlowService,
+  BAD_CREDENTIALS,
+  EMAIL_TAKEN,
+  fromBetterAuth,
+  HANDLE_TAKEN,
+  toContractUser,
+} from '@/auth/auth-flow.service.js';
+import type { Auth } from '@/auth/auth.factory.js';
+import { ApiException, SERVER_ERROR_MESSAGE } from '@/common/api-exception.js';
+import type { PrismaService } from '@/prisma/prisma.service.js';
+
+const refused = (
+  status: 'BAD_REQUEST' | 'UNAUTHORIZED' | 'UNPROCESSABLE_ENTITY',
+  code: string,
+) => APIError.from(status, { code, message: `raw ${code} text` });
+
+const logger = new Logger('test');
+const SIGN_UP = {
+  email: 'fan@lineup.gg',
+  password: 'correct-horse',
+  handle: 'fan_05',
+};
+const USER = { id: 'u-1', handle: 'fan_05', email: 'fan@lineup.gg' };
+
+describe('toContractUser', () => {
+  it('keeps only the contract fields, resolved by the server', () => {
+    expect(toContractUser(USER)).toEqual({
+      id: 'u-1',
+      handle: 'fan_05',
+      isGuest: false,
+      tier: 'free',
+    });
+  });
+});
+
+describe('fromBetterAuth', () => {
+  const logError = vi.spyOn(logger, 'error');
+
+  beforeEach(() => {
+    logError.mockReset().mockImplementation(() => undefined);
+  });
+
+  it.each([
+    ['USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', 'UNPROCESSABLE_ENTITY'],
+    ['USER_ALREADY_EXISTS', 'UNPROCESSABLE_ENTITY'],
+  ] as const)('maps %s to a taken email', (code, status) => {
+    expect(fromBetterAuth(refused(status, code), logger)).toMatchObject({
+      status: 400,
+      error: { code: 'invalid_input', message: EMAIL_TAKEN },
+    });
+  });
+
+  it('maps bad credentials to unauthorized', () => {
+    const mapped = fromBetterAuth(
+      refused('UNAUTHORIZED', 'INVALID_EMAIL_OR_PASSWORD'),
+      logger,
+    );
+    expect(mapped).toMatchObject({
+      status: 401,
+      error: { code: 'unauthorized', message: BAD_CREDENTIALS },
+    });
+  });
+
+  it('maps any other 400 to a generic invalid input', () => {
+    const mapped = fromBetterAuth(
+      refused('BAD_REQUEST', 'PASSWORD_TOO_SHORT'),
+      logger,
+    );
+    expect(mapped).toMatchObject({ error: { code: 'invalid_input' } });
+    expect(JSON.stringify(mapped)).not.toContain('raw');
+  });
+
+  it('turns anything else into server_error, logging the code only', () => {
+    const mapped = fromBetterAuth(
+      refused('UNPROCESSABLE_ENTITY', 'FAILED_TO_CREATE_USER'),
+      logger,
+    );
+    expect(mapped).toMatchObject({
+      status: 500,
+      error: { code: 'server_error', message: SERVER_ERROR_MESSAGE },
+    });
+    expect(logError).toHaveBeenCalledWith(
+      'Better Auth refused with FAILED_TO_CREATE_USER',
+    );
+  });
+
+  it('passes a non-Better Auth error through untouched', () => {
+    const crash = new Error('connect ECONNREFUSED');
+    expect(fromBetterAuth(crash, logger)).toBe(crash);
+  });
+
+  it('logs the status when Better Auth gives no code', () => {
+    fromBetterAuth(APIError.fromStatus('INTERNAL_SERVER_ERROR'), logger);
+    expect(logError).toHaveBeenCalledWith(
+      'Better Auth refused with INTERNAL_SERVER_ERROR',
+    );
+  });
+});
+
+describe('AuthFlowService', () => {
+  const api = {
+    getSession: vi.fn(),
+    signUpEmail: vi.fn(),
+    signInEmail: vi.fn(),
+    signOut: vi.fn(),
+  };
+  const queryRaw = vi.fn();
+  const service = new AuthFlowService(
+    { api } as unknown as AuthService<Auth>,
+    { $queryRaw: queryRaw } as unknown as PrismaService,
+  );
+  const headers = new Headers({ cookie: 'lineup.session_token=abc' });
+  const issued = (user = USER) => ({
+    headers: new Headers([
+      ['set-cookie', 'lineup.session_token=new; HttpOnly'],
+    ]),
+    response: { token: 't', user },
+  });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    queryRaw.mockResolvedValue([]);
+  });
+
+  it('signs up with the handle as the display name', async () => {
+    api.signUpEmail.mockResolvedValue(issued());
+
+    const result = await service.signUp(SIGN_UP, headers);
+
+    expect(api.signUpEmail).toHaveBeenCalledWith({
+      body: { ...SIGN_UP, name: 'fan_05' },
+      headers,
+      returnHeaders: true,
+    });
+    expect(result).toEqual({
+      data: { user: toContractUser(USER) },
+      cookies: ['lineup.session_token=new; HttpOnly'],
+    });
+  });
+
+  it('refuses a taken handle before calling Better Auth', async () => {
+    queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+
+    await expect(service.signUp(SIGN_UP, headers)).rejects.toMatchObject({
+      error: { code: 'invalid_input', message: HANDLE_TAKEN },
+    });
+    expect(api.signUpEmail).not.toHaveBeenCalled();
+  });
+
+  it('reports a handle lost to a race as taken', async () => {
+    queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{}]);
+    api.signUpEmail.mockRejectedValue(
+      refused('UNPROCESSABLE_ENTITY', 'FAILED_TO_CREATE_USER'),
+    );
+
+    await expect(service.signUp(SIGN_UP, headers)).rejects.toMatchObject({
+      error: { message: HANDLE_TAKEN },
+    });
+  });
+
+  it('keeps the email error when the handle is still free', async () => {
+    api.signUpEmail.mockRejectedValue(
+      refused('UNPROCESSABLE_ENTITY', 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL'),
+    );
+
+    await expect(service.signUp(SIGN_UP, headers)).rejects.toMatchObject({
+      error: { code: 'invalid_input', message: EMAIL_TAKEN },
+    });
+    expect(queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it('signs in and returns the issued cookie', async () => {
+    api.signInEmail.mockResolvedValue(issued());
+    const body = { email: SIGN_UP.email, password: SIGN_UP.password };
+
+    const result = await service.signIn(body, headers);
+
+    expect(api.signInEmail).toHaveBeenCalledWith({
+      body,
+      headers,
+      returnHeaders: true,
+    });
+    expect(result).toEqual({
+      data: { user: toContractUser(USER) },
+      cookies: ['lineup.session_token=new; HttpOnly'],
+    });
+  });
+
+  it('maps a refused sign-in to an ApiException', async () => {
+    api.signInEmail.mockRejectedValue(
+      refused('UNAUTHORIZED', 'INVALID_EMAIL_OR_PASSWORD'),
+    );
+
+    const error = await service
+      .signIn({ email: SIGN_UP.email, password: 'wrong-pass' }, headers)
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiException);
+    expect(error).toMatchObject({ error: { code: 'unauthorized' } });
+  });
+
+  it('returns null with no session', async () => {
+    api.getSession.mockResolvedValue({
+      headers: new Headers(),
+      response: null,
+    });
+    expect(await service.getSession(headers)).toEqual({
+      data: null,
+      cookies: [],
+    });
+  });
+
+  it('returns the user and the refreshed cookie', async () => {
+    api.getSession.mockResolvedValue({
+      headers: new Headers([['set-cookie', 'lineup.session_token=renewed']]),
+      response: { session: {}, user: USER },
+    });
+    expect(await service.getSession(headers)).toEqual({
+      data: { user: toContractUser(USER) },
+      cookies: ['lineup.session_token=renewed'],
+    });
+  });
+
+  it('treats a session deleted mid-refresh as signed out', async () => {
+    api.getSession.mockRejectedValue(
+      refused('UNAUTHORIZED', 'FAILED_TO_GET_SESSION'),
+    );
+    expect(await service.getSession(headers)).toEqual({
+      data: null,
+      cookies: [],
+    });
+  });
+
+  it('never reads a failed lookup as signed out', async () => {
+    vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    api.getSession.mockRejectedValue(
+      refused('UNPROCESSABLE_ENTITY', 'FAILED_TO_GET_SESSION'),
+    );
+
+    await expect(service.getSession(headers)).rejects.toMatchObject({
+      error: { code: 'server_error' },
+    });
+  });
+
+  it('forwards the cookies that clear a session', async () => {
+    api.signOut.mockResolvedValue({
+      headers: new Headers([
+        ['set-cookie', 'lineup.session_token=; Max-Age=0'],
+      ]),
+      response: { success: true },
+    });
+    expect(await service.signOut(headers)).toEqual({
+      data: null,
+      cookies: ['lineup.session_token=; Max-Age=0'],
+    });
+  });
+});

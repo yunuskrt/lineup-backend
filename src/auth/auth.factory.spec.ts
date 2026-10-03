@@ -47,6 +47,11 @@ describe('createAuth', () => {
     expect(validate('ist 05')).toHaveProperty('issues');
   });
 
+  it('closes the native email routes and keeps info logs off', () => {
+    expect(options.disabledPaths).toEqual(['/sign-up/email', '/sign-in/email']);
+    expect(options.logger).toEqual({ level: 'warn' });
+  });
+
   it('takes its secret and URL from the environment', () => {
     expect([options.secret, options.baseURL]).toEqual([
       env.BETTER_AUTH_SECRET,

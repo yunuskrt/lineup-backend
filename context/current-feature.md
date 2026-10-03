@@ -29,3 +29,4 @@ Not Started
 - B06 Player & Alias Schema: raw+normalized aliases, pg_trgm, unaccent
 - B07 Match & Lineup Schema: matches, sides, XIs, events, 8 CHECKs
 - B08 Scoring & Session Schema: 6 tables, 2 migrations, 17 CHECKs
+- B09 Seed Script: web mock fixtures, idempotent diff-sync, db:seed

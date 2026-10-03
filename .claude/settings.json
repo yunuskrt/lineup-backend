@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "mcp__claude_ai_Context7__query-docs"
+      "mcp__claude_ai_Context7__query-docs",
+      "Bash(npx prettier *)",
+      "Bash(npx vitest *)",
+      "Bash(npx oxlint *)",
+      "Bash(echo \"lint exit=$?\")",
+      "Bash(awk -F// '{ c=$NF; if \\(length\\(c\\) > 51\\) print \"LONG:\", $0 }')",
+      "Bash(npx tsc *)",
+      "Bash(npm test *)"
     ]
   }
 }

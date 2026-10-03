@@ -1,20 +1,12 @@
 # Current Feature
 
-<!-- Feature Name -->
-
 ## Status
-
-<!-- Not Started|In Progress|Completed -->
 
 Not Started
 
 ## Goals
 
-<!-- Goals & requirements -->
-
 ## Notes
-
-<!-- Any extra notes -->
 
 ## History
 
@@ -32,3 +24,4 @@ Not Started
 - B09 Seed Script: web mock fixtures, idempotent diff-sync, db:seed
 - B10a Better Auth Core: auth tables, uuid(7) users, handle rule, user FKs
 - B10b Auth Endpoints: /auth session, sign-up/in/out, cookies, safe errors
+- B11a Guest & Upgrade: anonymous plugin, in-place upgrade, 30-day sessions

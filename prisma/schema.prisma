@@ -413,6 +413,8 @@ model User {
   image         String?
   // Unique on lower(handle), in migration SQL
   handle        String
+  // A guest: Better Auth's anonymous plugin
+  isAnonymous   Boolean  @default(false) @map("is_anonymous")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

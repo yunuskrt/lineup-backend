@@ -115,8 +115,8 @@ describe('Auth endpoints (e2e)', () => {
     }
 
     it('is renewed, with a fresh cookie, once a day old', async () => {
-      // 5 of 7 days left: past the 1-day update age
-      const cookie = await signedUpExpiring('renew', 5 * DAY_MS);
+      // 25 of 30 days left: past the 1-day update age
+      const cookie = await signedUpExpiring('renew', 25 * DAY_MS);
 
       const res = await http().get('/auth/session').set('Cookie', cookie);
 
@@ -124,12 +124,12 @@ describe('Auth endpoints (e2e)', () => {
       const renewed = cookiesOf(res).find((c) =>
         c.startsWith(`${SESSION_COOKIE}=`),
       );
-      expect(renewed).toMatch(/Max-Age=604800/);
+      expect(renewed).toMatch(/Max-Age=2592000/);
       const [stored] = await prisma.session.findMany({
         where: { user: { email: 'test-http-renew@lineup.test' } },
       });
       expect(stored.expiresAt.getTime()).toBeGreaterThan(
-        Date.now() + 6 * DAY_MS,
+        Date.now() + 29 * DAY_MS,
       );
     });
 

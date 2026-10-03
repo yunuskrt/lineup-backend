@@ -11,22 +11,30 @@ function edited(change: (input: SeedDataInput) => void): SeedDataInput {
   return copy;
 }
 
+// Other suites commit test- rows mid-run
+const notTest = { slug: { not: { startsWith: 'test-' } } };
+const realMatch = { match: notTest };
+
 // Ids and update stamps of every seeded table
 async function snapshot(tx: Tx) {
   const stamp = (rows: { id: string; updatedAt: Date }[]) =>
     rows.map((r) => `${r.id}@${r.updatedAt.getTime()}`).sort();
   const seeded = { slug: { in: SEED_INPUT.players.map((p) => p.id) } };
   return {
-    competitions: stamp(await tx.competition.findMany()),
-    seasons: stamp(await tx.season.findMany()),
-    clubs: stamp(await tx.club.findMany()),
+    competitions: stamp(await tx.competition.findMany({ where: notTest })),
+    seasons: stamp(
+      await tx.season.findMany({ where: { competition: notTest } }),
+    ),
+    clubs: stamp(await tx.club.findMany({ where: notTest })),
     players: stamp(await tx.player.findMany({ where: seeded })),
     aliases: stamp(
       await tx.playerAlias.findMany({ where: { player: seeded } }),
     ),
-    matches: stamp(await tx.match.findMany()),
-    teams: stamp(await tx.matchTeam.findMany()),
-    lineups: stamp(await tx.lineup.findMany()),
+    matches: stamp(await tx.match.findMany({ where: notTest })),
+    teams: stamp(await tx.matchTeam.findMany({ where: realMatch })),
+    lineups: stamp(
+      await tx.lineup.findMany({ where: { matchTeam: realMatch } }),
+    ),
   };
 }
 
@@ -176,9 +184,10 @@ describe('Seed (e2e)', () => {
     });
 
     const { error, matches } = await rolledBack(async (tx) => {
-      const before = await tx.match.count();
+      const count = () => tx.match.count({ where: notTest });
+      const before = await count();
       const error = await seed(tx, input).catch((e: unknown) => e);
-      return { error, matches: (await tx.match.count()) - before };
+      return { error, matches: (await count()) - before };
     });
 
     expect(error).toBeInstanceOf(Error);

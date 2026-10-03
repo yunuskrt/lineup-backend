@@ -2,11 +2,15 @@ import { Logger } from '@nestjs/common';
 import type { AuthService } from '@thallesp/nestjs-better-auth';
 import { APIError } from 'better-auth/api';
 import {
+  ALREADY_REGISTERED,
+  asAuthUser,
   AuthFlowService,
   BAD_CREDENTIALS,
   EMAIL_TAKEN,
   fromBetterAuth,
   HANDLE_TAKEN,
+  NO_SESSION,
+  SIGN_OUT_FIRST,
   toContractUser,
 } from '@/auth/auth-flow.service.js';
 import type { Auth } from '@/auth/auth.factory.js';
@@ -34,6 +38,23 @@ describe('toContractUser', () => {
       isGuest: false,
       tier: 'free',
     });
+  });
+
+  it('reads isGuest from the stored anonymous flag only', () => {
+    expect(toContractUser({ ...USER, isAnonymous: true }).isGuest).toBe(true);
+    expect(toContractUser({ ...USER, isAnonymous: null }).isGuest).toBe(false);
+  });
+});
+
+describe('asAuthUser', () => {
+  it('keeps the fields the contract user needs', () => {
+    expect(
+      asAuthUser({ id: 'g-1', handle: 'guest-abc12345', isAnonymous: true }),
+    ).toEqual({ id: 'g-1', handle: 'guest-abc12345', isAnonymous: true });
+  });
+
+  it('refuses a user without a handle', () => {
+    expect(() => asAuthUser({ id: 'g-1' })).toThrow();
   });
 });
 
@@ -255,6 +276,249 @@ describe('AuthFlowService', () => {
     expect(await service.signOut(headers)).toEqual({
       data: null,
       cookies: ['lineup.session_token=; Max-Age=0'],
+    });
+  });
+});
+
+describe('AuthFlowService guests', () => {
+  const GUEST = { id: 'g-1', handle: 'guest-abc12345', isAnonymous: true };
+  const UPGRADE = {
+    email: 'Fan@Lineup.gg',
+    password: 'correct-horse',
+    handle: 'fan_05',
+  };
+  const api = {
+    getSession: vi.fn(),
+    signInAnonymous: vi.fn(),
+    signInEmail: vi.fn(),
+  };
+  const hash = vi.fn();
+  const tx = {
+    $queryRaw: vi.fn(),
+    user: { update: vi.fn() },
+    account: { create: vi.fn() },
+  };
+  const prisma = {
+    $queryRaw: vi.fn(),
+    $transaction: vi.fn((run: (client: typeof tx) => Promise<void>) => run(tx)),
+    user: { findUnique: vi.fn() },
+    session: { deleteMany: vi.fn() },
+  };
+  const service = new AuthFlowService(
+    {
+      api,
+      instance: { $context: Promise.resolve({ password: { hash } }) },
+    } as unknown as AuthService<Auth>,
+    prisma as unknown as PrismaService,
+  );
+  const headers = new Headers({ cookie: 'lineup.session_token=guest' });
+  const signedIn = (user: object) => ({
+    headers: new Headers([['set-cookie', 'lineup.session_token=s']]),
+    response: { session: {}, user },
+  });
+  const anonymous = () => ({
+    headers: new Headers([['set-cookie', 'lineup.session_token=g']]),
+    response: { token: 'g', user: GUEST },
+  });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    prisma.$transaction.mockImplementation(
+      (run: (client: typeof tx) => Promise<void>) => run(tx),
+    );
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.user.findUnique.mockResolvedValue(null);
+    tx.$queryRaw.mockResolvedValue([{ is_anonymous: true }]);
+    hash.mockResolvedValue('scrypt-hash');
+    api.getSession.mockResolvedValue({
+      headers: new Headers(),
+      response: null,
+    });
+  });
+
+  describe('continueAsGuest', () => {
+    it('creates a guest when signed out', async () => {
+      api.signInAnonymous.mockResolvedValue(anonymous());
+
+      expect(await service.continueAsGuest(headers)).toEqual({
+        data: { user: toContractUser(GUEST) },
+        cookies: ['lineup.session_token=g'],
+      });
+      expect(api.signInAnonymous).toHaveBeenCalledWith({
+        headers,
+        returnHeaders: true,
+      });
+    });
+
+    it('returns the current guest instead of a second one', async () => {
+      api.getSession.mockResolvedValue(signedIn(GUEST));
+
+      const result = await service.continueAsGuest(headers);
+
+      expect(result.data.user).toEqual(toContractUser(GUEST));
+      expect(api.signInAnonymous).not.toHaveBeenCalled();
+    });
+
+    it('refuses a signed-in account', async () => {
+      api.getSession.mockResolvedValue(signedIn(USER));
+
+      await expect(service.continueAsGuest(headers)).rejects.toMatchObject({
+        error: { code: 'forbidden', message: SIGN_OUT_FIRST },
+      });
+      expect(api.signInAnonymous).not.toHaveBeenCalled();
+    });
+
+    it('tries once more after a handle collision', async () => {
+      api.signInAnonymous
+        .mockRejectedValueOnce(new Error('unique violation'))
+        .mockResolvedValueOnce(anonymous());
+
+      const result = await service.continueAsGuest(headers);
+
+      expect(result.data.user.isGuest).toBe(true);
+      expect(api.signInAnonymous).toHaveBeenCalledTimes(2);
+    });
+
+    it('gives up after the second collision', async () => {
+      const crash = new Error('unique violation');
+      api.signInAnonymous.mockRejectedValue(crash);
+
+      await expect(service.continueAsGuest(headers)).rejects.toBe(crash);
+      expect(api.signInAnonymous).toHaveBeenCalledTimes(2);
+    });
+
+    it('maps a Better Auth refusal without retrying', async () => {
+      api.signInAnonymous.mockRejectedValue(
+        refused('BAD_REQUEST', 'ANONYMOUS_USERS_CANNOT_SIGN_IN_AGAIN'),
+      );
+
+      await expect(service.continueAsGuest(headers)).rejects.toMatchObject({
+        error: { code: 'invalid_input' },
+      });
+      expect(api.signInAnonymous).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('upgradeGuest', () => {
+    const NEW_USER = { ...USER, id: 'g-1', isAnonymous: false };
+
+    beforeEach(() => {
+      api.getSession.mockResolvedValue({ session: {}, user: GUEST });
+      api.signInEmail.mockResolvedValue({
+        headers: new Headers([['set-cookie', 'lineup.session_token=new']]),
+        response: { token: 'new', user: NEW_USER },
+      });
+    });
+
+    it('upgrades in place, keeping the user id', async () => {
+      const result = await service.upgradeGuest(UPGRADE, headers);
+
+      expect(result).toEqual({
+        data: { user: { ...toContractUser(NEW_USER), id: 'g-1' } },
+        cookies: ['lineup.session_token=new'],
+      });
+      expect(tx.user.update).toHaveBeenCalledWith({
+        where: { id: 'g-1' },
+        data: {
+          email: 'fan@lineup.gg',
+          handle: 'fan_05',
+          name: 'fan_05',
+          isAnonymous: false,
+          emailVerified: false,
+        },
+      });
+      expect(tx.account.create).toHaveBeenCalledWith({
+        data: {
+          userId: 'g-1',
+          accountId: 'g-1',
+          providerId: 'credential',
+          password: 'scrypt-hash',
+        },
+      });
+      expect(hash).toHaveBeenCalledWith('correct-horse');
+    });
+
+    it('signs in afresh and drops the guest sessions', async () => {
+      await service.upgradeGuest(UPGRADE, headers);
+
+      expect(api.signInEmail).toHaveBeenCalledWith({
+        body: { email: 'fan@lineup.gg', password: 'correct-horse' },
+        headers,
+        returnHeaders: true,
+      });
+      expect(prisma.session.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 'g-1', token: { not: 'new' } },
+      });
+    });
+
+    it('refuses with no session', async () => {
+      api.getSession.mockResolvedValue(null);
+
+      await expect(
+        service.upgradeGuest(UPGRADE, headers),
+      ).rejects.toMatchObject({
+        error: { code: 'unauthorized', message: NO_SESSION },
+      });
+    });
+
+    it('refuses a registered account before checking the form', async () => {
+      api.getSession.mockResolvedValue({ session: {}, user: USER });
+      prisma.$queryRaw.mockResolvedValue([{}]);
+
+      await expect(
+        service.upgradeGuest(UPGRADE, headers),
+      ).rejects.toMatchObject({
+        error: { code: 'forbidden', message: ALREADY_REGISTERED },
+      });
+    });
+
+    it('refuses a taken handle, then a taken email', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([{}]);
+      await expect(
+        service.upgradeGuest(UPGRADE, headers),
+      ).rejects.toMatchObject({
+        error: { code: 'invalid_input', message: HANDLE_TAKEN },
+      });
+
+      prisma.user.findUnique.mockResolvedValueOnce({ id: 'u-9' });
+      await expect(
+        service.upgradeGuest(UPGRADE, headers),
+      ).rejects.toMatchObject({
+        error: { code: 'invalid_input', message: EMAIL_TAKEN },
+      });
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'fan@lineup.gg' },
+        select: { id: true },
+      });
+      expect(tx.user.update).not.toHaveBeenCalled();
+    });
+
+    it('checks again for a guest inside the transaction', async () => {
+      tx.$queryRaw.mockResolvedValue([{ is_anonymous: false }]);
+
+      await expect(
+        service.upgradeGuest(UPGRADE, headers),
+      ).rejects.toMatchObject({
+        error: { code: 'forbidden', message: ALREADY_REGISTERED },
+      });
+      expect(tx.user.update).not.toHaveBeenCalled();
+      expect(api.signInEmail).not.toHaveBeenCalled();
+    });
+
+    it('reports a handle lost to a race as taken', async () => {
+      tx.user.update.mockRejectedValue(new Error('unique violation'));
+      prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{}]);
+
+      await expect(
+        service.upgradeGuest(UPGRADE, headers),
+      ).rejects.toMatchObject({ error: { message: HANDLE_TAKEN } });
+    });
+
+    it('passes on a database failure that is not a race', async () => {
+      const crash = new Error('connection reset');
+      tx.user.update.mockRejectedValue(crash);
+
+      await expect(service.upgradeGuest(UPGRADE, headers)).rejects.toBe(crash);
     });
   });
 });

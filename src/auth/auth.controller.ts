@@ -11,8 +11,10 @@ import {
   sessionSchema,
   signInRequestSchema,
   signUpRequestSchema,
+  upgradeGuestRequestSchema,
   type SignInRequest,
   type SignUpRequest,
+  type UpgradeGuestRequest,
 } from '@/contract/auth.js';
 import { componentRef } from '@/contract/openapi.js';
 
@@ -58,6 +60,24 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     return sendCookies(res, await this.auth.signIn(body, headersOf(req)));
+  }
+
+  @Post('guest')
+  @ContractResponse(sessionSchema)
+  async guest(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return sendCookies(res, await this.auth.continueAsGuest(headersOf(req)));
+  }
+
+  @Post('upgrade')
+  @ApiBody({ schema: { $ref: componentRef('UpgradeGuestRequest') } })
+  @ContractResponse(sessionSchema)
+  async upgrade(
+    @Body(new ZodValidationPipe(upgradeGuestRequestSchema))
+    body: UpgradeGuestRequest,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return sendCookies(res, await this.auth.upgradeGuest(body, headersOf(req)));
   }
 
   @Post('sign-out')

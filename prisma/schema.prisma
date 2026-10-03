@@ -70,6 +70,7 @@ model Club {
 
   aliases    ClubAlias[]
   matchTeams MatchTeam[]
+  favouredBy UserStats[]
 
   @@map("clubs")
 }
@@ -100,6 +101,7 @@ model Player {
   aliases     PlayerAlias[]
   lineups     Lineup[]
   matchEvents MatchEvent[]
+  guesses     Guess[]
 
   @@map("players")
 }
@@ -160,9 +162,11 @@ model Match {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  season Season       @relation(fields: [seasonId], references: [id], onDelete: Restrict)
-  teams  MatchTeam[]
-  events MatchEvent[]
+  season       Season             @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  teams        MatchTeam[]
+  events       MatchEvent[]
+  sessions     GameSession[]
+  memorability MemorabilityScore?
 
   @@index([seasonId])
   @@map("matches")
@@ -227,4 +231,173 @@ model MatchEvent {
   @@index([matchId])
   @@index([playerId])
   @@map("match_events")
+}
+
+enum GameMode {
+  solo
+  duel
+
+  @@map("game_mode")
+}
+
+enum GameStatus {
+  active
+  over
+
+  @@map("game_status")
+}
+
+enum SoloEndReason {
+  lives_out
+  quit
+  perfect_clear
+
+  @@map("solo_end_reason")
+}
+
+// From the participant's own view
+enum DuelOutcome {
+  win
+  loss
+  draw
+  forfeit_win
+
+  @@map("duel_outcome")
+}
+
+enum RoundEndReason {
+  found
+  expired
+  ended
+
+  @@map("round_end_reason")
+}
+
+enum GuessOutcome {
+  correct_new
+  already_found
+  not_in_xi
+
+  @@map("guess_outcome")
+}
+
+// Internal quality gate; never exposed (HC 20)
+model MemorabilityScore {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  matchId          String   @unique @map("match_id") @db.Uuid
+  score            Float
+  // Per-signal breakdown, for QA (B22)
+  signals          Json
+  algorithmVersion String   @map("algorithm_version")
+  computedAt       DateTime @map("computed_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Restrict)
+
+  @@map("memorability_scores")
+}
+
+model GameSession {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  mode          GameMode
+  status        GameStatus     @default(active)
+  matchId       String         @map("match_id") @db.Uuid
+  // Null until a solo player picks a side
+  side          Side?
+  startedAt     DateTime       @default(now()) @map("started_at")
+  endedAt       DateTime?      @map("ended_at")
+  soloEndReason SoloEndReason? @map("solo_end_reason")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  match        Match             @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  participants GameParticipant[]
+  rounds       GameRound[]
+
+  @@index([matchId])
+  @@map("game_sessions")
+}
+
+model GameParticipant {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  sessionId      String       @map("session_id") @db.Uuid
+  // Better Auth user id; FK added in B10
+  userId         String       @map("user_id")
+  seat           Int
+  livesRemaining Int          @default(3) @map("lives_remaining")
+  duelOutcome    DuelOutcome? @map("duel_outcome")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  rounds  GameRound[]
+
+  @@unique([sessionId, seat])
+  @@unique([sessionId, userId])
+  @@index([userId])
+  @@map("game_participants")
+}
+
+model GameRound {
+  id            String          @id @default(uuid(7)) @db.Uuid
+  sessionId     String          @map("session_id") @db.Uuid
+  number        Int
+  // Whose turn it was
+  participantId String          @map("participant_id") @db.Uuid
+  startedAt     DateTime        @map("started_at")
+  endsAt        DateTime        @map("ends_at")
+  endedAt       DateTime?       @map("ended_at")
+  endReason     RoundEndReason? @map("end_reason")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  session     GameSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participant GameParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  guesses     Guess[]
+
+  @@unique([sessionId, number])
+  @@index([participantId])
+  @@map("game_rounds")
+}
+
+model Guess {
+  id         String       @id @default(uuid(7)) @db.Uuid
+  roundId    String       @map("round_id") @db.Uuid
+  // As received, trimmed; never logged
+  text       String
+  outcome    GuessOutcome
+  // The starter it resolved to; null if not_in_xi
+  playerId   String?      @map("player_id") @db.Uuid
+  receivedAt DateTime     @default(now()) @map("received_at")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  round  GameRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player Player?   @relation(fields: [playerId], references: [id], onDelete: Restrict)
+
+  @@index([roundId])
+  @@index([playerId])
+  @@map("guesses")
+}
+
+model UserStats {
+  // Better Auth user id; FK added in B10
+  userId          String   @id @map("user_id")
+  played          Int      @default(0)
+  wins            Int      @default(0)
+  losses          Int      @default(0)
+  draws           Int      @default(0)
+  perfectClears   Int      @default(0) @map("perfect_clears")
+  bestStreak      Int      @default(0) @map("best_streak")
+  correctGuesses  Int      @default(0) @map("correct_guesses")
+  totalGuesses    Int      @default(0) @map("total_guesses")
+  favouriteClubId String?  @map("favourite_club_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  favouriteClub Club? @relation(fields: [favouriteClubId], references: [id], onDelete: SetNull)
+
+  @@index([favouriteClubId])
+  @@map("user_stats")
 }

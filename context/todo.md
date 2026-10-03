@@ -15,7 +15,7 @@ This todo file is for developer-side use.
 - [x] **Phase B05 — Club & Competition Schema**: competitions, seasons, clubs and club_aliases with migration.
 - [x] **Phase B06 — Player & Alias Schema**: players and player_aliases, plus `pg_trgm` and `unaccent`.
 - [x] **Phase B07 — Match & Lineup Schema**: matches, match_teams, match_events and lineups with migration.
-- [ ] **Phase B08 — Scoring & Session Schema**: memorability_scores, game_sessions, game_rounds, guesses, stats.
+- [x] **Phase B08 — Scoring & Session Schema**: memorability_scores, game_sessions, game_rounds, guesses, stats.
 - [ ] **Phase B09 — Seed Script**: Idempotent seed loading the web mock fixtures into a Neon dev branch.
 - [ ] **Phase B10 — Auth Module**: Better Auth in NestJS with email/password, Google and Apple providers.
 - [ ] **Phase B11 — Guest & Linking**: Anonymous plugin, trusted-provider linking, email verification.

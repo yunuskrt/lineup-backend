@@ -27,3 +27,4 @@ Not Started
 - B04 Prisma & Neon: Prisma 7.10 + adapter-pg, startup probe, db:* scripts
 - B05 Club & Competition Schema: 4 tables, first migration, 7 CHECKs
 - B06 Player & Alias Schema: raw+normalized aliases, pg_trgm, unaccent
+- B07 Match & Lineup Schema: matches, sides, XIs, events, 8 CHECKs

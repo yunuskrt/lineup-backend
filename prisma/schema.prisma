@@ -10,7 +10,7 @@ datasource db {
   provider = "postgresql"
 }
 
-// Values match CompetitionKind in src/contract/common.ts
+// Values match src/contract CompetitionKind
 enum CompetitionKind {
   league
   ucl
@@ -41,7 +41,7 @@ model Competition {
   @@map("competitions")
 }
 
-// CHECK constraints on label/start_year live in the migration SQL
+// label/start_year CHECKs live in migration SQL
 model Season {
   id            String   @id @default(uuid(7)) @db.Uuid
   competitionId String   @map("competition_id") @db.Uuid
@@ -51,6 +51,7 @@ model Season {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  matches     Match[]
 
   @@unique([competitionId, label])
   @@map("seasons")
@@ -67,7 +68,8 @@ model Club {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  aliases ClubAlias[]
+  aliases    ClubAlias[]
+  matchTeams MatchTeam[]
 
   @@map("clubs")
 }
@@ -95,12 +97,14 @@ model Player {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  aliases PlayerAlias[]
+  aliases     PlayerAlias[]
+  lineups     Lineup[]
+  matchEvents MatchEvent[]
 
   @@map("players")
 }
 
-// Matching reads `normalized` only; `alias` is as written
+// Matching reads `normalized`; `alias` is raw
 model PlayerAlias {
   id         String   @id @default(uuid(7)) @db.Uuid
   playerId   String   @map("player_id") @db.Uuid
@@ -113,4 +117,114 @@ model PlayerAlias {
 
   @@unique([playerId, normalized])
   @@map("player_aliases")
+}
+
+// Values match src/contract Side, PositionGroup
+enum Side {
+  home
+  away
+
+  @@map("side")
+}
+
+enum PositionGroup {
+  GK
+  DF
+  MF
+  FW
+
+  @@map("position_group")
+}
+
+// Just enough for B19's drama signals
+enum MatchEventKind {
+  goal
+  own_goal
+  penalty_goal
+  red_card
+
+  @@map("match_event_kind")
+}
+
+model Match {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  slug         String   @unique
+  seasonId     String   @map("season_id") @db.Uuid
+  date         DateTime @db.Date
+  // Display text only: `Final`, `Matchday 34`
+  stage        String?
+  nickname     String?
+  extraTime    Boolean  @default(false) @map("extra_time")
+  shootoutHome Int?     @map("shootout_home")
+  shootoutAway Int?     @map("shootout_away")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  season Season       @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  teams  MatchTeam[]
+  events MatchEvent[]
+
+  @@index([seasonId])
+  @@map("matches")
+}
+
+model MatchTeam {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  matchId   String   @map("match_id") @db.Uuid
+  side      Side
+  clubId    String   @map("club_id") @db.Uuid
+  goals     Int
+  // Null until the lineup is ingested (B20)
+  formation String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  match   Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  club    Club     @relation(fields: [clubId], references: [id], onDelete: Restrict)
+  lineups Lineup[]
+
+  @@unique([matchId, side])
+  @@unique([matchId, clubId])
+  @@index([clubId])
+  @@map("match_teams")
+}
+
+// The answer key: starters only, never sent
+model Lineup {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  matchTeamId String        @map("match_team_id") @db.Uuid
+  playerId    String        @map("player_id") @db.Uuid
+  slot        Int
+  position    PositionGroup
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  matchTeam MatchTeam @relation(fields: [matchTeamId], references: [id], onDelete: Cascade)
+  player    Player    @relation(fields: [playerId], references: [id], onDelete: Restrict)
+
+  @@unique([matchTeamId, slot])
+  @@unique([matchTeamId, playerId])
+  @@index([playerId])
+  @@map("lineups")
+}
+
+model MatchEvent {
+  id        String         @id @default(uuid(7)) @db.Uuid
+  matchId   String         @map("match_id") @db.Uuid
+  kind      MatchEventKind
+  minute    Int
+  // 90+3 is minute 90, addedTime 3
+  addedTime Int?           @map("added_time")
+  // The side the event counts for
+  side      Side
+  playerId  String?        @map("player_id") @db.Uuid
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  match  Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player? @relation(fields: [playerId], references: [id], onDelete: Restrict)
+
+  @@index([matchId])
+  @@index([playerId])
+  @@map("match_events")
 }

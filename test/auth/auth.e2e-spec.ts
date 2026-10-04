@@ -65,6 +65,7 @@ describe('Auth endpoints (e2e)', () => {
           id: expect.any(String),
           handle: 'test-h-flow',
           isGuest: false,
+          emailVerified: false,
           tier: 'free',
         },
       },

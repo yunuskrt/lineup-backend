@@ -5,15 +5,19 @@ import { AuthController } from '@/auth/auth.controller.js';
 import { createAuth } from '@/auth/auth.factory.js';
 import { ENV } from '@/config/config.module.js';
 import type { Env } from '@/config/env.schema.js';
+import { MailModule } from '@/mail/mail.module.js';
+import { MAILER, type Mailer } from '@/mail/mailer.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 
 // Mounted as Express middleware on /api/auth/*
 @Module({
   imports: [
+    MailModule,
     BetterAuthModule.forRootAsync({
-      inject: [PrismaService, ENV],
-      useFactory: (prisma: PrismaService, env: Env) => ({
-        auth: createAuth(prisma, env),
+      imports: [MailModule],
+      inject: [PrismaService, ENV, MAILER],
+      useFactory: (prisma: PrismaService, env: Env, mailer: Mailer) => ({
+        auth: createAuth(prisma, env, mailer),
         // JSON only: a form post can't sign anyone in
         bodyParser: {
           json: { limit: '16kb' },

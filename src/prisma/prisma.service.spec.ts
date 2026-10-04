@@ -7,6 +7,8 @@ const env: Env = {
   DATABASE_URL: 'postgresql://u:p@db.example.com/neondb',
   BETTER_AUTH_SECRET: 'k'.repeat(32),
   BETTER_AUTH_URL: 'http://localhost:8080',
+  WEB_APP_URL: 'http://localhost:3000',
+  MAIL_FROM: 'Lineup <onboarding@resend.dev>',
 };
 
 describe('PrismaService', () => {

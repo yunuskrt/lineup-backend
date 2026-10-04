@@ -148,9 +148,11 @@ RESEND_API_KEY="re_…"
 
 - `WEB_APP_URL` is where the link sends the player after confirming. The web app doesn't have to be running for verification to work.
 - `MAIL_FROM` must stay `onboarding@resend.dev` until Step 9. Resend refuses any other sender on an unverified domain.
-- **To use the log mailer, delete the `RESEND_API_KEY` line or comment it out.** Don't leave it as an empty string.
+- **To use the log mailer, delete the `RESEND_API_KEY` line or comment it out.** Don't leave it as an empty string: the key must start with `re_`, so an empty or mistyped key stops the server at boot.
 - `RESEND_API_KEY` is a secret: never commit it. In production it's required, and the server refuses to boot without it.
-- On boot, the server log says which mailer it chose (Resend or log).
+- On boot, the server log says which mailer it chose: `Sending mail through Resend`, or `WARN [Mail] No RESEND_API_KEY: mail goes to the log`.
+- **The e2e suite never sends real mail.** It ignores `RESEND_API_KEY`, even when `.env` has one.
+- **Stop any other server on port 8080 first.** A server started before B11b keeps running the old code, and a second one fails with `EADDRINUSE`.
 
 ### Step 6 — Test with the log mailer (after B11b)
 
@@ -163,7 +165,7 @@ RESEND_API_KEY="re_…"
      http://localhost:8080/auth/sign-up
    ```
 
-3. Find the verification link in the server log. It looks like `http://localhost:8080/api/auth/verify-email?token=…&callbackURL=…`.
+3. Find the verification link in the server log, under `LOG [Mail] Not sent (no RESEND_API_KEY): "Confirm your Lineup email"`. It looks like `http://localhost:8080/api/auth/verify-email?token=…&callbackURL=http%3A%2F%2Flocalhost%3A3000%2Fprofile`. The log shows the mail's text but never the address.
 4. Open it with curl, to see the redirect:
 
    ```bash
@@ -173,6 +175,7 @@ RESEND_API_KEY="re_…"
 **What to expect:**
 
 - `302`, with `Location: http://localhost:3000/profile`
+- The sign-up response had `"emailVerified": false`. Now `curl -b /tmp/lineup.jar http://localhost:8080/auth/session` shows `"emailVerified": true`.
 - In Prisma Studio (`npm run db:studio`), the user's `email_verified` is now `true`
 - **Clean up:** delete the user in Prisma Studio
 
@@ -187,13 +190,13 @@ RESEND_API_KEY="re_…"
      http://localhost:8080/auth/sign-up
    ```
 
-3. The sign-up answers with a `Session` straight away. Within a minute, a mail from `onboarding@resend.dev` arrives. Check spam if it doesn't.
+3. The sign-up answers with a `Session` straight away, with `"emailVerified": false`. Within a minute, a mail from `onboarding@resend.dev` with the subject **Confirm your Lineup email** arrives. Check spam if it doesn't.
 4. Click the link in the mail.
 
 **What to expect:**
 
 - The browser goes to `http://localhost:3000/profile`. If the web app isn't running, the browser shows "can't connect", which is fine: the address was verified before the redirect.
-- `email_verified` is `true` in Prisma Studio
+- `curl -b /tmp/lineup.jar http://localhost:8080/auth/session` shows `"emailVerified": true`, and `email_verified` is `true` in Prisma Studio
 - In Resend's dashboard under **Emails**, the mail shows as **Delivered**
 - **A broken link:** copy the link, change one character of the token, and open it. It redirects to `/profile` with an `error=` parameter (for example `INVALID_TOKEN`), and `email_verified` doesn't change.
 - **Clean up:** delete the user in Prisma Studio. Step 8 needs the same address free again.
@@ -242,9 +245,11 @@ Needed before real players sign up: until then, mail to anyone but you is refuse
 | `/auth/session` returns `null` right after sign-up | curl wasn't given the cookie file (`-b /tmp/lineup.jar`) |
 | The browser app can't stay signed in | Expected until B13 sets up cross-origin cookies; test with curl |
 | Boot fails naming `WEB_APP_URL` or `MAIL_FROM` | Missing from `.env` (Step 5) |
-| Boot fails naming `RESEND_API_KEY` | `NODE_ENV=production` without a key, or the key is an empty string. Comment the line out instead. |
+| Boot fails naming `RESEND_API_KEY` | `NODE_ENV=production` without a key, or a key that doesn't start with `re_` (an empty string included). Comment the line out instead. |
 | Sign-up works but no mail arrives | Signed up with an address other than your Resend account's (Step 4). Check **Emails** in Resend, and the server log for a refused send. |
-| The server log shows a refused send | A wrong or deleted API key, or a `MAIL_FROM` other than `onboarding@resend.dev` before Step 9 |
+| The server log shows `Verification mail not sent: Resend refused the mail with 403` | Sent to an address other than your Resend account's, or a `MAIL_FROM` other than `onboarding@resend.dev` before Step 9 |
+| The server log shows `Verification mail not sent: Resend refused the mail with 401` | A wrong or deleted API key |
+| Boot fails with `EADDRINUSE` | Another server, maybe started before B11b, is already on port 8080. Stop it first. |
 | The link redirects with `error=TOKEN_EXPIRED` | Older than 24 hours. Delete the user and sign up again. |
 | The link redirects with `error=INVALID_TOKEN` | The link was cut short when copied, or `BETTER_AUTH_SECRET` changed after it was sent |
 

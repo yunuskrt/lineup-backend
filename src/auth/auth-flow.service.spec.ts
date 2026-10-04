@@ -15,6 +15,7 @@ import {
 } from '@/auth/auth-flow.service.js';
 import type { Auth } from '@/auth/auth.factory.js';
 import { ApiException, SERVER_ERROR_MESSAGE } from '@/common/api-exception.js';
+import type { Env } from '@/config/env.schema.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
 
 const refused = (
@@ -29,6 +30,8 @@ const SIGN_UP = {
   handle: 'fan_05',
 };
 const USER = { id: 'u-1', handle: 'fan_05', email: 'fan@lineup.gg' };
+const ENV_STUB = { WEB_APP_URL: 'http://localhost:3000' } as Env;
+const CALLBACK = 'http://localhost:3000/profile';
 
 describe('toContractUser', () => {
   it('keeps only the contract fields, resolved by the server', () => {
@@ -36,8 +39,23 @@ describe('toContractUser', () => {
       id: 'u-1',
       handle: 'fan_05',
       isGuest: false,
+      emailVerified: false,
       tier: 'free',
     });
+  });
+
+  it('reads emailVerified from the stored flag', () => {
+    expect(toContractUser({ ...USER, emailVerified: true }).emailVerified).toBe(
+      true,
+    );
+    expect(toContractUser({ ...USER, emailVerified: null }).emailVerified).toBe(
+      false,
+    );
+  });
+
+  it('never marks a guest as verified', () => {
+    const guest = { ...USER, isAnonymous: true, emailVerified: true };
+    expect(toContractUser(guest).emailVerified).toBe(false);
   });
 
   it('reads isGuest from the stored anonymous flag only', () => {
@@ -50,7 +68,12 @@ describe('asAuthUser', () => {
   it('keeps the fields the contract user needs', () => {
     expect(
       asAuthUser({ id: 'g-1', handle: 'guest-abc12345', isAnonymous: true }),
-    ).toEqual({ id: 'g-1', handle: 'guest-abc12345', isAnonymous: true });
+    ).toEqual({
+      id: 'g-1',
+      handle: 'guest-abc12345',
+      isAnonymous: true,
+      emailVerified: false,
+    });
   });
 
   it('refuses a user without a handle', () => {
@@ -133,6 +156,7 @@ describe('AuthFlowService', () => {
   const service = new AuthFlowService(
     { api } as unknown as AuthService<Auth>,
     { $queryRaw: queryRaw } as unknown as PrismaService,
+    ENV_STUB,
   );
   const headers = new Headers({ cookie: 'lineup.session_token=abc' });
   const issued = (user = USER) => ({
@@ -147,13 +171,13 @@ describe('AuthFlowService', () => {
     queryRaw.mockResolvedValue([]);
   });
 
-  it('signs up with the handle as the display name', async () => {
+  it('signs up with the handle as the display name and the callback', async () => {
     api.signUpEmail.mockResolvedValue(issued());
 
     const result = await service.signUp(SIGN_UP, headers);
 
     expect(api.signUpEmail).toHaveBeenCalledWith({
-      body: { ...SIGN_UP, name: 'fan_05' },
+      body: { ...SIGN_UP, name: 'fan_05', callbackURL: CALLBACK },
       headers,
       returnHeaders: true,
     });
@@ -291,6 +315,7 @@ describe('AuthFlowService guests', () => {
     getSession: vi.fn(),
     signInAnonymous: vi.fn(),
     signInEmail: vi.fn(),
+    sendVerificationEmail: vi.fn(),
   };
   const hash = vi.fn();
   const tx = {
@@ -310,6 +335,7 @@ describe('AuthFlowService guests', () => {
       instance: { $context: Promise.resolve({ password: { hash } }) },
     } as unknown as AuthService<Auth>,
     prisma as unknown as PrismaService,
+    ENV_STUB,
   );
   const headers = new Headers({ cookie: 'lineup.session_token=guest' });
   const signedIn = (user: object) => ({
@@ -449,6 +475,55 @@ describe('AuthFlowService guests', () => {
       expect(prisma.session.deleteMany).toHaveBeenCalledWith({
         where: { userId: 'g-1', token: { not: 'new' } },
       });
+    });
+
+    it('sends a verification mail to the new address', async () => {
+      await service.upgradeGuest(UPGRADE, headers);
+
+      expect(api.sendVerificationEmail).toHaveBeenCalledWith({
+        body: { email: 'fan@lineup.gg', callbackURL: CALLBACK },
+      });
+    });
+
+    it('still upgrades when the verification send fails', async () => {
+      const logError = vi
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+      api.sendVerificationEmail.mockRejectedValue(
+        refused('BAD_REQUEST', 'VERIFICATION_EMAIL_NOT_ENABLED'),
+      );
+
+      const result = await service.upgradeGuest(UPGRADE, headers);
+
+      expect(result.data.user.id).toBe('g-1');
+      expect(logError).toHaveBeenCalledWith(
+        'Verification mail not sent: VERIFICATION_EMAIL_NOT_ENABLED',
+      );
+      expect(JSON.stringify(logError.mock.calls)).not.toContain('fan@');
+    });
+
+    it('logs no message from a send failure that is not Better Auth', async () => {
+      const logError = vi
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+      api.sendVerificationEmail.mockRejectedValue(
+        new Error('connect failed for fan@lineup.gg'),
+      );
+
+      const result = await service.upgradeGuest(UPGRADE, headers);
+
+      expect(result.data.user.id).toBe('g-1');
+      expect(logError).toHaveBeenCalledWith(
+        'Verification mail not sent: error',
+      );
+      expect(JSON.stringify(logError.mock.calls)).not.toContain('fan@');
+    });
+
+    it('sends nothing when the upgrade is refused', async () => {
+      tx.$queryRaw.mockResolvedValue([{ is_anonymous: false }]);
+
+      await expect(service.upgradeGuest(UPGRADE, headers)).rejects.toThrow();
+      expect(api.sendVerificationEmail).not.toHaveBeenCalled();
     });
 
     it('refuses with no session', async () => {

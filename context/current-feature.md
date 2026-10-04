@@ -25,3 +25,4 @@ Not Started
 - B10a Better Auth Core: auth tables, uuid(7) users, handle rule, user FKs
 - B10b Auth Endpoints: /auth session, sign-up/in/out, cookies, safe errors
 - B11a Guest & Upgrade: anonymous plugin, in-place upgrade, 30-day sessions
+- B11b Email Verification: Resend mailer, soft verify, emailVerified in User

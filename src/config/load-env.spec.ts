@@ -2,6 +2,8 @@ const REQUIRED = {
   DATABASE_URL: 'postgresql://u:p@db.example.com/neondb',
   BETTER_AUTH_SECRET: 'a'.repeat(32),
   BETTER_AUTH_URL: 'http://localhost:8080',
+  WEB_APP_URL: 'http://localhost:3000',
+  MAIL_FROM: 'Lineup <onboarding@resend.dev>',
 };
 type Key = keyof typeof REQUIRED | 'PORT';
 const KEYS: Key[] = ['PORT', ...(Object.keys(REQUIRED) as Key[])];

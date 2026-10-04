@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AuthService } from '@thallesp/nestjs-better-auth';
 import { isAPIError } from 'better-auth/api';
 import { ApiException, SERVER_ERROR_MESSAGE } from '@/common/api-exception.js';
 import type { Auth } from '@/auth/auth.factory.js';
+import { ENV } from '@/config/config.module.js';
+import type { Env } from '@/config/env.schema.js';
 import type {
   Session,
   SignInRequest,
@@ -28,14 +30,21 @@ const EMAIL_IN_USE = new Set([
 // The Set-Cookie lines to forward with the result
 export type WithCookies<T> = { data: T; cookies: string[] };
 
-type AuthUser = { id: string; handle: string; isAnonymous?: boolean | null };
+type AuthUser = {
+  id: string;
+  handle: string;
+  isAnonymous?: boolean | null;
+  emailVerified?: boolean | null;
+};
 
 export function toContractUser(user: AuthUser): User {
-  // Both resolved here, never read from a request
+  // All resolved here, never read from a request
+  const isGuest = user.isAnonymous === true;
   return {
     id: user.id,
     handle: user.handle,
-    isGuest: user.isAnonymous === true,
+    isGuest,
+    emailVerified: !isGuest && user.emailVerified === true,
     tier: 'free',
   };
 }
@@ -51,6 +60,7 @@ export function asAuthUser(
     id: user.id,
     handle: user.handle,
     isAnonymous: user.isAnonymous === true,
+    emailVerified: user.emailVerified === true,
   };
 }
 
@@ -79,7 +89,13 @@ export class AuthFlowService {
   constructor(
     private readonly betterAuth: AuthService<Auth>,
     private readonly prisma: PrismaService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
+
+  // Where the verification link sends the player
+  private get verifiedCallback(): string {
+    return `${this.env.WEB_APP_URL}/profile`;
+  }
 
   // Forwards the cookie a refresh or expiry sets
   async getSession(headers: Headers): Promise<WithCookies<Session | null>> {
@@ -109,7 +125,13 @@ export class AuthFlowService {
     await this.assertHandleFree(handle);
     try {
       const result = await this.betterAuth.api.signUpEmail({
-        body: { email, password, handle, name: handle },
+        body: {
+          email,
+          password,
+          handle,
+          name: handle,
+          callbackURL: this.verifiedCallback,
+        },
         headers,
         returnHeaders: true,
       });
@@ -186,7 +208,26 @@ export class AuthFlowService {
       await this.assertEmailFree(address);
       throw error;
     }
-    return this.reissueSession(guest.id, address, password, headers);
+    const session = await this.reissueSession(
+      guest.id,
+      address,
+      password,
+      headers,
+    );
+    await this.sendVerification(address);
+    return session;
+  }
+
+  // Upgrade done; a failed send can't undo it
+  private async sendVerification(email: string): Promise<void> {
+    try {
+      await this.betterAuth.api.sendVerificationEmail({
+        body: { email, callbackURL: this.verifiedCallback },
+      });
+    } catch (error) {
+      const code = isAPIError(error) ? error.body?.code : undefined;
+      this.logger.error(`Verification mail not sent: ${code ?? 'error'}`);
+    }
   }
 
   private async signInAnonymous(

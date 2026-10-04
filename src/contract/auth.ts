@@ -13,6 +13,8 @@ export const userSchema = z
     id: idSchema,
     handle: z.string().min(1),
     isGuest: z.boolean(),
+    // Always false for a guest, who has no email
+    emailVerified: z.boolean(),
     // Resolved by the server, never asserted by a client
     tier: tierSchema,
   })

@@ -45,7 +45,7 @@ curl -s -b /tmp/guest.jar -c /tmp/guest.jar -X POST http://localhost:8080/auth/g
 
 **What to expect:**
 
-- `{ "success": true, "data": { "user": { "id", "handle": "guest-…", "isGuest": true, "tier": "free" } } }`
+- `{ "success": true, "data": { "user": { "id", "handle": "guest-…", "isGuest": true, "emailVerified": false, "tier": "free" } } }`. A guest is never verified.
 - The handle is `guest-` plus 8 lowercase letters and digits, for example `guest-cd5n64p0`
 - The same `id` all three times
 
@@ -113,7 +113,7 @@ curl -s -b /tmp/guest-old.jar http://localhost:8080/auth/session
 
 **What to expect:**
 
-- The upgrade returns the **same `id`** as Step 1, with `"handle": "upgradetest"` and `"isGuest": false`
+- The upgrade returns the **same `id`** as Step 1, with `"handle": "upgradetest"`, `"isGuest": false` and `"emailVerified": false`. From B11b, a verification mail goes to the new address; see `auth-setup.md` § Email Verification.
 - The new cookie reads back the same user
 - The old cookie reads back `{ "success": true, "data": null }`
 

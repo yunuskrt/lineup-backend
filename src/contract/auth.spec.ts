@@ -62,10 +62,25 @@ describe('signUpRequestSchema', () => {
 });
 
 describe('userSchema', () => {
+  const user = {
+    id: 'u-1',
+    handle: 'fan',
+    isGuest: true,
+    emailVerified: false,
+    tier: 'free',
+  };
+
   it('only accepts known tiers', () => {
-    const user = { id: 'u-1', handle: 'fan', isGuest: true, tier: 'free' };
     expect(userSchema.safeParse(user).success).toBe(true);
     expect(userSchema.safeParse({ ...user, tier: 'admin' }).success).toBe(
+      false,
+    );
+  });
+
+  it('requires emailVerified as a boolean', () => {
+    const { emailVerified: _, ...withoutIt } = user;
+    expect(userSchema.safeParse(withoutIt).success).toBe(false);
+    expect(userSchema.safeParse({ ...user, emailVerified: 'no' }).success).toBe(
       false,
     );
   });

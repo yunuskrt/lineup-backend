@@ -19,7 +19,7 @@ This todo file is for developer-side use.
 - [x] **Phase B09 — Seed Script**: Idempotent seed loading the web mock fixtures into a Neon dev branch.
 - [x] **Phase B10 — Auth Module**: Better Auth in NestJS with email/password sign-up and sign-in.
 - [x] **Phase B11 — Guest & Linking**: Anonymous plugin, guest-to-account linking, email verification.
-- [ ] **Phase B12 — Guards & JWT**: Route guards, session resolution and JWT issuance for the gateway.
+- [x] **Phase B12 — Guards & JWT**: Route guards, session resolution and JWT issuance for the gateway.
 - [ ] **Phase B13 — CORS & Cookies**: Credentialed CORS, parent-domain cookie scope, bearer for mobile.
 - [ ] **Phase B14 — Users Module**: Profile, stats and guest-upgrade endpoints over the users schema.
 - [ ] **Phase B15 — Ingestion Harness**: Rerunnable runner with provider client, disk cache and rate limits.

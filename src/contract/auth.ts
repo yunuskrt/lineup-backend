@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { idSchema, tierSchema } from '@/contract/common.js';
+import { epochMsSchema, idSchema, tierSchema } from '@/contract/common.js';
 import {
   MAX_HANDLE_LENGTH,
   MAX_PASSWORD_LENGTH,
@@ -25,6 +25,16 @@ export const sessionSchema = z
   .object({ user: userSchema })
   .register(contractRegistry, { id: 'Session' });
 export type Session = z.infer<typeof sessionSchema>;
+
+// GET /auth/token: the socket handshake's credential
+export const gatewayTokenSchema = z
+  .object({
+    token: z.string().min(1),
+    // Server clock: fetch a new one before this
+    expiresAt: epochMsSchema,
+  })
+  .register(contractRegistry, { id: 'GatewayToken' });
+export type GatewayToken = z.infer<typeof gatewayTokenSchema>;
 
 // GET /auth/session: null when signed out
 export const sessionOrNullSchema = sessionSchema

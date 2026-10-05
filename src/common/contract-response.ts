@@ -33,6 +33,18 @@ function successDoc(schema: z.ZodType) {
   };
 }
 
+// The failure envelope, for documented errors
+export function failureDoc() {
+  return {
+    type: 'object',
+    required: ['success', 'error'],
+    properties: {
+      success: { type: 'boolean', enum: [false] },
+      error: { $ref: componentRef('ApiError') },
+    },
+  };
+}
+
 // Every success is 200, POST included, as documented
 export function ContractResponse(schema: z.ZodType) {
   return applyDecorators(

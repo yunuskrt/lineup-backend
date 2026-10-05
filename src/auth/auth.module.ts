@@ -4,6 +4,8 @@ import { AuthModule as BetterAuthModule } from '@thallesp/nestjs-better-auth';
 import { AuthFlowService } from '@/auth/auth-flow.service.js';
 import { AuthController } from '@/auth/auth.controller.js';
 import { createAuth } from '@/auth/auth.factory.js';
+import { GatewayTokenController } from '@/auth/gateway-token.controller.js';
+import { GatewayTokenService } from '@/auth/gateway-token.service.js';
 import { SessionGuard } from '@/auth/session.guard.js';
 import { ENV } from '@/config/config.module.js';
 import type { Env } from '@/config/env.schema.js';
@@ -30,7 +32,13 @@ import { PrismaService } from '@/prisma/prisma.service.js';
       disableGlobalAuthGuard: true,
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthFlowService, { provide: APP_GUARD, useClass: SessionGuard }],
+  controllers: [AuthController, GatewayTokenController],
+  providers: [
+    AuthFlowService,
+    GatewayTokenService,
+    { provide: APP_GUARD, useClass: SessionGuard },
+  ],
+  // B36's handshake verifies tokens with it
+  exports: [GatewayTokenService],
 })
 export class AuthModule {}

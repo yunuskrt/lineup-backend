@@ -476,3 +476,19 @@ model Verification {
   @@index([identifier])
   @@map("auth_verifications")
 }
+
+// Better Auth's JWT signing keys, for the gateway
+model Jwks {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  // A public JWK, as JSON
+  publicKey  String    @map("public_key")
+  // Encrypted with BETTER_AUTH_SECRET
+  privateKey String    @map("private_key")
+  alg        String?
+  crv        String?
+  expiresAt  DateTime? @map("expires_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@map("auth_jwks")
+}

@@ -4,6 +4,10 @@ import {
   type OpenAPIObject,
   SwaggerModule,
 } from '@nestjs/swagger';
+import {
+  SESSION_COOKIE,
+  SESSION_SCHEME,
+} from '@/auth/session-docs.decorator.js';
 import { contractComponents } from '@/contract/openapi.js';
 import { PROTOCOL_VERSION } from '@/contract/protocol.js';
 
@@ -16,6 +20,11 @@ export function setupDocs(app: INestApplication): void {
     .setTitle('Lineup API')
     .setDescription('Every response is a { success, data | error } envelope.')
     .setVersion(String(PROTOCOL_VERSION))
+    .addCookieAuth(
+      SESSION_COOKIE,
+      { type: 'apiKey', in: 'cookie', name: SESSION_COOKIE },
+      SESSION_SCHEME,
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

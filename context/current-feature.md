@@ -27,3 +27,4 @@ Not Started
 - B11a Guest & Upgrade: anonymous plugin, in-place upgrade, 30-day sessions
 - B11b Email Verification: Resend mailer, soft verify, emailVerified in User
 - B12a Session Guard: global deny-by-default, @Public, @CurrentUser
+- B12b Gateway JWT: GET /auth/token, 5-min sub-only JWT, auth_jwks table

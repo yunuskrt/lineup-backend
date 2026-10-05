@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { anonymous } from 'better-auth/plugins';
+import { anonymous, jwt } from 'better-auth/plugins';
 import { generateGuestHandle } from '@/auth/guest-handle.js';
 import { verificationEmail } from '@/auth/verification-email.js';
 import type { Env } from '@/config/env.schema.js';
@@ -17,6 +17,8 @@ import type { PrismaService } from '@/prisma/prisma.service.js';
 export const GUEST_EMAIL_DOMAIN = 'guest.lineup.invalid';
 export const SESSION_LIFETIME_S = 30 * 24 * 60 * 60;
 export const VERIFICATION_LIFETIME_S = 24 * 60 * 60;
+// Used once, at the socket handshake
+export const GATEWAY_TOKEN_LIFETIME = '5m';
 
 // Not awaited: a failed send can't block sign-up
 export function sendVerification(
@@ -91,6 +93,15 @@ export function createAuth(prisma: PrismaService, env: Env, mailer: Mailer) {
         emailDomainName: GUEST_EMAIL_DOMAIN,
         generateName: () => generateGuestHandle(),
       }),
+      jwt({
+        jwt: {
+          // sub only: a JWT is readable by its holder
+          definePayload: () => ({}),
+          expirationTime: GATEWAY_TOKEN_LIFETIME,
+        },
+        // No client reads the per-session JWT header
+        disableSettingJwtHeader: true,
+      }),
     ],
     advanced: {
       cookiePrefix: 'lineup',
@@ -107,6 +118,9 @@ export function createAuth(prisma: PrismaService, env: Env, mailer: Mailer) {
       '/delete-anonymous-user',
       // Open to anyone, it would mail any address
       '/send-verification-email',
+      // Clients use /auth/token; keys stay in-process
+      '/token',
+      '/jwks',
     ],
     // Its info logs carry emails
     logger: { level: 'warn' },

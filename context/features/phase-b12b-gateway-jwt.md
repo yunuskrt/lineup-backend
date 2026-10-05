@@ -2,7 +2,7 @@
 
 ## Status
 
-Not Started
+Complete
 
 ## Goals
 
@@ -28,6 +28,7 @@ Not Started
 
   - the first route **not** marked `@Public()`. It takes no user id from the request; the token is for whoever the session says.
   - guests get a token too: duels are open to guests (`project-overview.md` § F)
+  - OpenAPI marks it as needing the session cookie (`@ApiCookieAuth`, with a cookie security scheme for `lineup.session_token` in `src/docs/setup-docs.ts`) and documents the 401 `unauthorized` envelope. Carried over from B12a's review: it's the first guarded route.
 - Tests:
   - `src/auth/gateway-token.service.spec.ts` (unit, `auth.api` mocked): `issue` maps `exp` to `expiresAt` in ms; `verify` returns the subject, and `null` for a refused, malformed or throwing verification
   - `src/auth/auth.factory.spec.ts`: the plugin settings, the payload carrying no email or handle, the closed paths
@@ -39,11 +40,11 @@ Not Started
     - no cookie → 401 `unauthorized`
     - the native `/api/auth/token` and JWKS routes return 404
     - after the first token, `auth_jwks` holds one key whose `private_key` isn't plain JWK JSON
-    - `/docs/openapi.json` documents `GET /auth/token` and the `GatewayToken` component
+    - `/docs/openapi.json` documents `GET /auth/token`, the `GatewayToken` component, the cookie security requirement and the 401
 
 ## Open Questions
 
-Settle these at `/feature load`.
+All four settled at `/feature load`, each as recommended.
 
 1. **A contract route, or Better Auth's native `/api/auth/token`?** **Recommended: a contract route, `GET /auth/token`, with the native one closed.** Same reasons as B10b: the envelope, the OpenAPI document, one surface to rate limit (B35), and `expiresAt` from the server clock so the client knows when to fetch another. The native route answers `{ token }` in Better Auth's own shape.
 2. **How long does a token live?** It's used once, on the socket handshake; after that the connection is authenticated, and a reconnect fetches a fresh token. **Recommended: 5 minutes.** Short enough that a leaked token is nearly useless, long enough for a slow mobile handshake. The plugin's default is 15 minutes.
@@ -74,5 +75,53 @@ Settle these at `/feature load`.
   - `npm test`, `npm run test:e2e`, `npm run build`, `npm run lint`, `npm run db:status`
   - By hand with curl on `npm run start:dev`: continue as guest, `GET /auth/token` with the cookie, decode the token's payload (base64) and see only the standard claims; `GET /auth/token` with no cookie gives 401
   - The e2e file owns its prefixes (`test-jwt-` emails, `test-j-` handles) and deletes its own users
+
+**Deviations recorded during implementation**
+
+- **`GET /auth/token` lives on its own `GatewayTokenController`** (`src/auth/gateway-token.controller.ts`), with the same `auth` prefix. `AuthController` is `@Public()` at class level, so a route added there would have been public; a separate controller keeps deny by default with no per-method override.
+- **No `jose` dependency.** `jose` is only a transitive dependency of Better Auth, so `issue` reads `exp` with `expiryOf(token)`, a base64url decode of the token's middle segment using Node's `Buffer`. It only reads a token Better Auth has just signed; the signature is checked by `verify`, through `auth.api.verifyJWT`.
+- **OpenAPI pieces** (the B12a carry-over):
+  - `failureDoc()` in `src/common/contract-response.ts` describes the failure envelope
+  - `@DocumentsSession()` in `src/auth/session-docs.decorator.ts` adds `@ApiCookieAuth('session')` and the 401
+  - `setupDocs` registers the `session` cookie scheme for `lineup.session_token`
+
+  Docs only: the guard does the checking.
+- **`auth_jwks` has `updated_at`,** beyond the plugin's own fields, as every table here does. Prisma fills it.
+- **How the private key is stored:** as `JSON.stringify` of the ciphertext, a quoted string encrypted with `BETTER_AUTH_SECRET`, never a JWK object. The e2e case asserts exactly that. The algorithm is the plugin's default, EdDSA (Ed25519).
+- **`AuthModule` exports `GatewayTokenService`,** so B36's gateway can verify handshake tokens.
+- **`issue` maps failures through `fromBetterAuth`.** The guard already refuses a request with no session, so a refusal reaching `issue` is unexpected and becomes `server_error`.
+- **Tests:** 305 unit (14 new) and 250 e2e (12 new).
+  - `gateway-token.service.spec.ts`, 13 cases:
+    - `expiryOf` on good, missing, wrongly typed and malformed claims
+    - `issue` returns the token and its expiry, and maps a refusal
+    - `verify` returns the subject, and `null` for a refused payload, a missing, empty or non-string subject, or a throw
+  - `auth.factory.spec.ts`: the closed `/token` and `/jwks` paths, a 5-minute expiry, an empty extra payload, and the header switched off
+  - `test/auth/gateway-token.e2e-spec.ts`, 12 cases:
+    - a guest's 5-minute token verifies to its own id
+    - the claims are exactly `aud`, `exp`, `iat`, `iss`, `sub`, with no email or handle
+    - a registered user's token verifies to the session's id
+    - tampered, wrong-audience, expired and non-JWT tokens all verify to `null`
+    - no cookie gives the 401 envelope
+    - the native `/api/auth/token` and `/api/auth/jwks` return 404
+    - the signing key is stored encrypted
+    - OpenAPI shows the route, the `session` cookie requirement, the 200 `GatewayToken` and the 401 `ApiError`
+- **Checked by hand** on the built server: a guest got a token valid for 299 s; its claims were only the five standard ones, with `sub` the guest's id and `iss`/`aud` `http://localhost:8080`; no cookie gave 401; both native routes returned 404; `GET /auth/session` sent no `set-auth-jwt` header. No errors in the log, and the test guest was deleted.
+  - It ran on port 8081, because the developer's server held 8080.
+- A Prettier run reformatted `test/auth/session-guard.e2e-spec.ts` (line wrapping only), a file from B12a. It was reverted to keep this change focused.
+- **Review fixes:**
+  - **`GET /auth/token` now sends `Cache-Control: no-store`.** It returns a bearer credential in a plain GET with no caching instruction, so a browser or shared proxy could have kept it. Token responses should never be stored (OAuth 2.0 requires it for the same reason). The guest e2e case asserts the header.
+  - **Totals:** 305 unit and 250 e2e, unchanged in count.
+- **Added at `/feature test`:** 1 unit case. `expiryOf` on a token whose claims are JSON `null` throws the clean "no expiry" error, not a TypeError.
+
+  **Coverage from unit tests:**
+  - `gateway-token.service.ts`: 100% lines, statements and functions; 92.85% branches. The one missed branch is TypeScript's emitted constructor metadata on the `@Injectable()` line, as in B12a.
+  - `auth.factory.ts` and `contract/auth.ts`: 100%.
+  - `gateway-token.controller.ts`, `session-docs.decorator.ts` and `failureDoc()` are wiring and documentation, covered by the e2e suite: the token route cases, and the OpenAPI case that checks the 401's failure envelope.
+
+  **Totals:** 306 unit and 250 e2e.
+- **Observations left for later phases:**
+  - **B36: a token outlives sign-out by up to 5 minutes.** The payload carries no session id, so verifying can't tell that the session behind it has ended, or that the user was deleted. On connect, B36 must load the user from the database and refuse a missing one. Accept the 5-minute window, or add a session claim and check it, if that window proves too long.
+  - **B13: CORS is now load-bearing for this route.** A credentialed CORS policy that allowed any origin would let any site `fetch('/auth/token', { credentials: 'include' })` and read a player's gateway token. B13 must allow only the web origin.
+  - **Key rotation** stays out of scope (B45). `verify` finds keys by `kid`, so rotation needs no code change here.
 
 ## History

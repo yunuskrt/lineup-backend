@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import {
   createAuth,
+  GATEWAY_TOKEN_LIFETIME,
   GUEST_EMAIL_DOMAIN,
   sendVerification,
   SESSION_LIFETIME_S,
@@ -69,6 +70,8 @@ describe('createAuth', () => {
       '/sign-in/anonymous',
       '/delete-anonymous-user',
       '/send-verification-email',
+      '/token',
+      '/jwks',
     ]);
     expect(options.logger).toEqual({ level: 'warn' });
   });
@@ -99,6 +102,19 @@ describe('createAuth', () => {
     expect(await before?.({ ...user, handle: 'fan_05' } as never)).toBe(
       undefined,
     );
+  });
+
+  it('signs 5-minute gateway tokens carrying only the subject', async () => {
+    const plugin = options.plugins.find((p) => p.id === 'jwt');
+    const jwtOptions = plugin?.options as {
+      jwt: { definePayload: () => object; expirationTime: string };
+      disableSettingJwtHeader: boolean;
+    };
+
+    expect(jwtOptions.jwt.expirationTime).toBe(GATEWAY_TOKEN_LIFETIME);
+    expect(GATEWAY_TOKEN_LIFETIME).toBe('5m');
+    expect(jwtOptions.jwt.definePayload()).toEqual({});
+    expect(jwtOptions.disableSettingJwtHeader).toBe(true);
   });
 
   it('keeps sessions for 30 days', () => {

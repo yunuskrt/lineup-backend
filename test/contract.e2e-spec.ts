@@ -11,6 +11,7 @@ import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { z } from 'zod';
 import { AppModule } from '@/app.module.js';
+import { Public } from '@/auth/public.decorator.js';
 import { ApiException } from '@/common/api-exception.js';
 import { ContractResponse } from '@/common/contract-response.js';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe.js';
@@ -22,6 +23,8 @@ import {
 } from '@/contract/profile.js';
 import { setupDocs } from '@/docs/setup-docs.js';
 
+// Envelope delivery, not auth: no session needed
+@Public()
 @Controller('__test')
 class ContractTestController {
   @Get('history')

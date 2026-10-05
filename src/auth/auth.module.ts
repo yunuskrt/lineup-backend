@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { AuthModule as BetterAuthModule } from '@thallesp/nestjs-better-auth';
 import { AuthFlowService } from '@/auth/auth-flow.service.js';
 import { AuthController } from '@/auth/auth.controller.js';
 import { createAuth } from '@/auth/auth.factory.js';
+import { SessionGuard } from '@/auth/session.guard.js';
 import { ENV } from '@/config/config.module.js';
 import type { Env } from '@/config/env.schema.js';
 import { MailModule } from '@/mail/mail.module.js';
@@ -29,6 +31,6 @@ import { PrismaService } from '@/prisma/prisma.service.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthFlowService],
+  providers: [AuthFlowService, { provide: APP_GUARD, useClass: SessionGuard }],
 })
 export class AuthModule {}

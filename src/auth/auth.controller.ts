@@ -4,6 +4,7 @@ import { fromNodeHeaders } from 'better-auth/node';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { AuthFlowService, type WithCookies } from '@/auth/auth-flow.service.js';
+import { Public } from '@/auth/public.decorator.js';
 import { ContractResponse } from '@/common/contract-response.js';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe.js';
 import {
@@ -27,6 +28,8 @@ function sendCookies<T>(res: Response, { data, cookies }: WithCookies<T>): T {
 }
 
 @ApiTags('auth')
+// Each route reads or creates its own session
+@Public()
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthFlowService) {}

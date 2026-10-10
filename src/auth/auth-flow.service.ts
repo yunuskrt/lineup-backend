@@ -27,8 +27,26 @@ const EMAIL_IN_USE = new Set([
   'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL',
 ]);
 
-// The Set-Cookie lines to forward with the result
-export type WithCookies<T> = { data: T; cookies: string[] };
+// Better Auth's bearer plugin names it so
+export const AUTH_TOKEN_HEADER = 'set-auth-token';
+
+// The Set-Cookie lines and bearer token to forward
+export type WithCookies<T> = {
+  data: T;
+  cookies: string[];
+  authToken: string | null;
+};
+type Issued = Omit<WithCookies<never>, 'data'>;
+
+const NOTHING_ISSUED: Issued = { cookies: [], authToken: null };
+
+// The cookie for the web, the token for mobile
+export function issued(headers: Headers): Issued {
+  return {
+    cookies: headers.getSetCookie(),
+    authToken: headers.get(AUTH_TOKEN_HEADER),
+  };
+}
 
 type AuthUser = {
   id: string;
@@ -107,12 +125,12 @@ export class AuthFlowService {
       const found = result.response;
       return {
         data: found ? { user: toContractUser(found.user) } : null,
-        cookies: result.headers.getSetCookie(),
+        ...issued(result.headers),
       };
     } catch (error) {
       // Deleted mid-refresh: the caller is signed out
       if (isAPIError(error) && error.statusCode === 401) {
-        return { data: null, cookies: [] };
+        return { data: null, ...NOTHING_ISSUED };
       }
       throw fromBetterAuth(error, this.logger);
     }
@@ -166,7 +184,7 @@ export class AuthFlowService {
         headers,
         returnHeaders: true,
       });
-      return { data: null, cookies: result.headers.getSetCookie() };
+      return { data: null, ...issued(result.headers) };
     } catch (error) {
       throw fromBetterAuth(error, this.logger);
     }
@@ -174,8 +192,8 @@ export class AuthFlowService {
 
   // Already a guest: the same identity comes back
   async continueAsGuest(headers: Headers): Promise<WithCookies<Session>> {
-    const { data: current, cookies } = await this.getSession(headers);
-    if (current?.user.isGuest) return { data: current, cookies };
+    const { data: current, ...forward } = await this.getSession(headers);
+    if (current?.user.isGuest) return { data: current, ...forward };
     if (current) throw new ApiException('forbidden', SIGN_OUT_FIRST);
     try {
       return await this.signInAnonymous(headers);
@@ -341,7 +359,7 @@ export class AuthFlowService {
   }): WithCookies<Session> {
     return {
       data: { user: toContractUser(result.response.user) },
-      cookies: result.headers.getSetCookie(),
+      ...issued(result.headers),
     };
   }
 }

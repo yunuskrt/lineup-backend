@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { anonymous, jwt } from 'better-auth/plugins';
+import { anonymous, bearer, jwt } from 'better-auth/plugins';
 import { generateGuestHandle } from '@/auth/guest-handle.js';
 import { verificationEmail } from '@/auth/verification-email.js';
 import type { Env } from '@/config/env.schema.js';
@@ -102,6 +102,8 @@ export function createAuth(prisma: PrismaService, env: Env, mailer: Mailer) {
         // No client reads the per-session JWT header
         disableSettingJwtHeader: true,
       }),
+      // Mobile: Authorization: Bearer, signed tokens only
+      bearer({ requireSignature: true }),
     ],
     advanced: {
       cookiePrefix: 'lineup',

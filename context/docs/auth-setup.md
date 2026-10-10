@@ -17,6 +17,7 @@ Sign-in methods: **email + password** and **continue as guest**. There is no soc
 | **Before B11b** | [Email Verification](#email-verification) Steps 4–5: Resend account, API key, `.env` keys | Free tier |
 | **After B11b** | [Email Verification](#email-verification) Steps 6–8: test the verification mail | — |
 | Before B45 | [Email Verification](#email-verification) Step 9: verify a sending domain | Free tier |
+| **After B13b** | [Bearer (mobile)](#bearer-mobile) Step 12: sign in and call the API with no cookies | — |
 | **After B13a** | [CORS & Cookies](#cors--cookies): check CORS and the origin check; `COOKIE_DOMAIN` only for production | — |
 | B45 | Production secret and URL on the host | — |
 
@@ -310,6 +311,46 @@ The server refuses to boot if `COOKIE_DOMAIN` doesn't cover the hosts of both `B
 
 ---
 
+## Bearer (mobile)
+
+From B13b, the mobile app authenticates with a header instead of a cookie.
+
+- Every sign-up, sign-in, guest and upgrade response carries a **`set-auth-token`** header, the session token. The web ignores it, and browser scripts can't read it.
+- The app sends it back as **`Authorization: Bearer <token>`**. Every route that reads a session accepts it, `GET /auth/token` included, so the app can reach the duel gateway too.
+- It's the same session as the web's cookie: signing out kills the token at once. If a request has both a cookie and a bearer token, the bearer token wins.
+- Only the full, signed token works. The part before the dot on its own is refused.
+
+### Step 12 — Call the API with a bearer token (after B13b)
+
+With `npm run start:dev` running, and **no cookie file anywhere**:
+
+```bash
+# Start as a guest, and keep only the token header
+TOKEN=$(curl -s -D - -o /dev/null -X POST http://localhost:8080/auth/guest \
+  | awk 'tolower($1) == "set-auth-token:" { print $2 }' | tr -d '\r')
+echo "$TOKEN"
+
+# Read the session, then a gateway token, with the header alone
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/auth/session
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/auth/token
+
+# Sign out; the same token then reads as signed out
+curl -s -H "Authorization: Bearer $TOKEN" -X POST http://localhost:8080/auth/sign-out
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/auth/session
+```
+
+**What to expect:**
+
+- `echo` prints a long value with a dot in it
+- the session shows the guest (`"isGuest": true`), and `/auth/token` returns `{ token, expiresAt }`
+- after sign-out, the session reads `"data": null`
+
+To try a registered user, sign in the same way and read `set-auth-token` from that response.
+
+**Clean up:** delete the guest in Prisma Studio.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -322,6 +363,8 @@ The server refuses to boot if `COOKIE_DOMAIN` doesn't cover the hosts of both `B
 | A POST returns `403` "Request refused." | It came from a page other than the web app or Swagger, with or without a cookie (Step 10) |
 | Boot fails naming `COOKIE_DOMAIN` | It doesn't cover both hosts, or isn't a domain like `lineup.gg` (Step 11) |
 | Boot fails with "Production needs https" | `NODE_ENV=production` with an `http://` `BETTER_AUTH_URL` or `WEB_APP_URL` |
+| A bearer call reads as signed out | The token was cut short (only the part before the dot), the `Bearer ` prefix is missing, or the session has been signed out |
+| A bearer write from the app gets `403` "Request refused." | The app's HTTP client sends an `Origin` header that isn't the web app's. The mobile app must send none. |
 | Boot fails naming `WEB_APP_URL` or `MAIL_FROM` | Missing from `.env` (Step 5) |
 | Boot fails naming `RESEND_API_KEY` | `NODE_ENV=production` without a key, or a key that doesn't start with `re_` (an empty string included). Comment the line out instead. |
 | Sign-up works but no mail arrives | Signed up with an address other than your Resend account's (Step 4). Check **Emails** in Resend, and the server log for a refused send. |
@@ -340,7 +383,7 @@ The server refuses to boot if `COOKIE_DOMAIN` doesn't cover the hosts of both `B
   - upgrade a guest to an email account without losing history (`POST /auth/upgrade`, same user id)
 - **B11b:** email verification, set up and tested per [Email Verification](#email-verification). Password reset comes in a later phase.
 - **B13a:** CORS, the origin check and `COOKIE_DOMAIN`, per [CORS & Cookies](#cors--cookies).
-- **B13b:** mobile gets bearer tokens.
+- **B13b:** mobile authenticates with bearer tokens, per [Bearer (mobile)](#bearer-mobile).
 - **B45:** set a new `BETTER_AUTH_SECRET` and the production `BETTER_AUTH_URL` (`https://api.lineup.gg`) on the host.
 - **Mobile project:** the `@better-auth/expo` plugin and the app's deep-link scheme.
 

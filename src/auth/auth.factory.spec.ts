@@ -148,6 +148,11 @@ describe('createAuth', () => {
     expect(jwtOptions.disableSettingJwtHeader).toBe(true);
   });
 
+  it('reads bearer tokens, signed ones only', () => {
+    const plugin = options.plugins.find((p) => p.id === 'bearer');
+    expect(plugin?.options).toEqual({ requireSignature: true });
+  });
+
   it('keeps sessions for 30 days', () => {
     expect(options.session?.expiresIn).toBe(SESSION_LIFETIME_S);
     expect(SESSION_LIFETIME_S).toBe(2_592_000);

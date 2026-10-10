@@ -2,7 +2,7 @@
 
 ## Status
 
-Not Started
+Complete
 
 ## Goals
 
@@ -32,7 +32,7 @@ Not Started
 
 ## Open Questions
 
-Settle these at `/feature load`.
+Both settled at `/feature load`, each as recommended.
 
 1. **How does mobile get its token: a header, or a field in the contract?** **Recommended: the `set-auth-token` header.**
    - It's Better Auth's own mechanism, and the one its Expo client reads.
@@ -62,5 +62,44 @@ Settle these at `/feature load`.
   - `npm test`, `npm run test:e2e`, `npm run build`, `npm run lint`
   - By hand: the curl steps in the new docs section, using no cookie file at all
   - The e2e file owns its prefixes (`test-bearer-` emails, `test-b-` handles) and deletes its own users
+
+**Deviations recorded during implementation**
+
+- **The token is forwarded the same way on every `/auth` route.** `issued(headers)` in `auth-flow.service.ts` reads both `Set-Cookie` and `set-auth-token`, and the controller's `sendCookies` sets `set-auth-token` whenever one is present. In practice:
+  - sign-up, sign-in, guest and upgrade always issue one
+  - sign-out never does, since the cookie is being cleared (pinned)
+  - `GET /auth/session` passes on the unchanged token when Better Auth refreshes the session
+
+  The spec named only the four routes; one rule is simpler than four exceptions.
+- **`ContractResponse` gained an optional `{ headers }`.** A second `@ApiOkResponse` would replace the first for the same status rather than merge, so the 200's `set-auth-token` header is documented through it.
+- **OpenAPI:** a `bearer` scheme (`http`, `bearer`) sits next to `session`. `@DocumentsSession()` lists both, so `GET /auth/token`'s security is `[{ session: [] }, { bearer: [] }]`, meaning either one. B12b's OpenAPI e2e expectation was updated to match.
+- **The token never reaches browser scripts.** Better Auth's after-hook also sets `Access-Control-Expose-Headers: set-auth-token` on its own response, but our routes copy only `set-auth-token`, and B13a's CORS exposes nothing. An e2e case pins a web-origin sign-in carrying the token with no expose header.
+- **Prettier rewrapped `test/auth/session-guard.e2e-spec.ts` again** (B12a's file); reverted, as in B12b.
+- **Docs:** `auth-setup.md` § Bearer (mobile), Step 12, captures the token with `awk`, since macOS `sed` has no case-insensitive flag. It also adds two troubleshooting rows (a token cut short or missing its `Bearer ` prefix; a mobile client that sends an `Origin`) and updates "At a glance" and "Later stages".
+- **Tests:** 353 unit (4 new) and 275 e2e (14 new).
+  - `auth-flow.service.spec.ts`: `issued` with and without a token; a sign-in forwarding its token; existing expectations gain `authToken: null`
+  - `auth.factory.spec.ts`: the bearer plugin with `requireSignature: true`
+  - `test/auth/bearer.e2e-spec.ts`, 14 cases with no cookies:
+    - sign-up, sign-in and guest each issue a token, and the web cookie is still set
+    - the token is never exposed to scripts
+    - the session and a gateway token are read by bearer alone
+    - an upgrade by bearer keeps the id with a fresh token, and kills the old one
+    - sign-out kills the token and issues none
+    - unsigned, tampered and deleted-session tokens read as signed out, and a guarded route gives 401
+    - no `Origin` passes the origin check; an untrusted one is refused and the session survives
+    - the bearer token wins over a cookie
+    - OpenAPI documents the scheme and the header on all four routes
+- **Checked by hand** on the built server, following Step 12 with no cookie file: the token was captured; the session read as the guest; `/auth/token` returned a gateway token; the unsigned half read as signed out; after sign-out the token read as signed out. The test guest was deleted.
+- **Review:** no changes needed. Every goal is met.
+  - `requireSignature` is real: without it the plugin would sign a bare session id itself and accept it, which the "unsigned" e2e case rules out.
+  - A bearer token that fails its signature check leaves the request's cookie in place, so "the bearer token wins" applies only to a valid token. That's the safe direction.
+  - The upgrade by bearer deletes the guest's sessions, so the old token dies (pinned).
+- **`/feature test`:** no new tests needed. **Coverage from unit tests:**
+  - `auth-flow.service.ts`: 100% branches and functions, 97% lines, with `issued()` and the token forwarding covered. The 3 uncovered lines are the B10b and B11a catch blocks noted before, all routed through the already-tested `fromBetterAuth`.
+  - `auth.factory.ts`: 100%.
+  - `session-docs.decorator.ts` and `contract-response.ts` are OpenAPI metadata, covered by the e2e suites: the bearer suite's OpenAPI case checks the security list and the header on all four routes, and B03b's contract suite covers `ContractResponse`.
+- **Observations left for later:**
+  - **Mobile project:** React Native's native networking keeps cookies by default (iOS's shared cookie storage, for example). The app may end up holding the session cookie alongside its bearer token. The bearer token wins, so nothing breaks, but the app should either switch cookie storage off for API calls or let the Expo plugin manage it.
+  - **The web receives `set-auth-token` too.** Browser scripts can't read it (not exposed by CORS), but it's visible in devtools, like the cookie itself. That's acceptable: same session, same holder.
 
 ## History

@@ -9,6 +9,7 @@ import {
   EMAIL_TAKEN,
   fromBetterAuth,
   HANDLE_TAKEN,
+  issued,
   NO_SESSION,
   SIGN_OUT_FIRST,
   toContractUser,
@@ -61,6 +62,23 @@ describe('toContractUser', () => {
   it('reads isGuest from the stored anonymous flag only', () => {
     expect(toContractUser({ ...USER, isAnonymous: true }).isGuest).toBe(true);
     expect(toContractUser({ ...USER, isAnonymous: null }).isGuest).toBe(false);
+  });
+});
+
+describe('issued', () => {
+  it('collects the cookies and the bearer token', () => {
+    const headers = new Headers([
+      ['set-cookie', 'lineup.session_token=s.sig; HttpOnly'],
+      ['set-auth-token', 's.sig'],
+    ]);
+    expect(issued(headers)).toEqual({
+      cookies: ['lineup.session_token=s.sig; HttpOnly'],
+      authToken: 's.sig',
+    });
+  });
+
+  it('gives a null token when none was issued', () => {
+    expect(issued(new Headers())).toEqual({ cookies: [], authToken: null });
   });
 });
 
@@ -184,6 +202,7 @@ describe('AuthFlowService', () => {
     expect(result).toEqual({
       data: { user: toContractUser(USER) },
       cookies: ['lineup.session_token=new; HttpOnly'],
+      authToken: null,
     });
   });
 
@@ -232,7 +251,25 @@ describe('AuthFlowService', () => {
     expect(result).toEqual({
       data: { user: toContractUser(USER) },
       cookies: ['lineup.session_token=new; HttpOnly'],
+      authToken: null,
     });
+  });
+
+  it('forwards the bearer token a sign-in issues', async () => {
+    api.signInEmail.mockResolvedValue({
+      headers: new Headers([
+        ['set-cookie', 'lineup.session_token=new; HttpOnly'],
+        ['set-auth-token', 'new.sig'],
+      ]),
+      response: { token: 't', user: USER },
+    });
+
+    const result = await service.signIn(
+      { email: SIGN_UP.email, password: SIGN_UP.password },
+      headers,
+    );
+
+    expect(result.authToken).toBe('new.sig');
   });
 
   it('maps a refused sign-in to an ApiException', async () => {
@@ -255,6 +292,7 @@ describe('AuthFlowService', () => {
     expect(await service.getSession(headers)).toEqual({
       data: null,
       cookies: [],
+      authToken: null,
     });
   });
 
@@ -266,6 +304,7 @@ describe('AuthFlowService', () => {
     expect(await service.getSession(headers)).toEqual({
       data: { user: toContractUser(USER) },
       cookies: ['lineup.session_token=renewed'],
+      authToken: null,
     });
   });
 
@@ -276,6 +315,7 @@ describe('AuthFlowService', () => {
     expect(await service.getSession(headers)).toEqual({
       data: null,
       cookies: [],
+      authToken: null,
     });
   });
 
@@ -300,6 +340,7 @@ describe('AuthFlowService', () => {
     expect(await service.signOut(headers)).toEqual({
       data: null,
       cookies: ['lineup.session_token=; Max-Age=0'],
+      authToken: null,
     });
   });
 });
@@ -369,6 +410,7 @@ describe('AuthFlowService guests', () => {
       expect(await service.continueAsGuest(headers)).toEqual({
         data: { user: toContractUser(GUEST) },
         cookies: ['lineup.session_token=g'],
+        authToken: null,
       });
       expect(api.signInAnonymous).toHaveBeenCalledWith({
         headers,
@@ -442,6 +484,7 @@ describe('AuthFlowService guests', () => {
       expect(result).toEqual({
         data: { user: { ...toContractUser(NEW_USER), id: 'g-1' } },
         cookies: ['lineup.session_token=new'],
+        authToken: null,
       });
       expect(tx.user.update).toHaveBeenCalledWith({
         where: { id: 'g-1' },

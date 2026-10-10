@@ -205,7 +205,8 @@ describe('Gateway token (e2e)', () => {
     };
     const route = doc.paths['/auth/token']?.get;
 
-    expect(route?.security).toEqual([{ session: [] }]);
+    // Cookie for the web, bearer for mobile (B13b)
+    expect(route?.security).toEqual([{ session: [] }, { bearer: [] }]);
     expect(route?.responses).toMatchObject({
       '200': {
         content: {

@@ -29,3 +29,4 @@ Not Started
 - B12a Session Guard: global deny-by-default, @Public, @CurrentUser
 - B12b Gateway JWT: GET /auth/token, 5-min sub-only JWT, auth_jwks table
 - B13a CORS & Origin Check: own CORS, origin-checked writes, COOKIE_DOMAIN
+- B13b Bearer for Mobile: signed bearer tokens, set-auth-token header

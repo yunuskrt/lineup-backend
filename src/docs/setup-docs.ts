@@ -7,7 +7,10 @@ import {
 import { AuthService } from '@thallesp/nestjs-better-auth';
 import { getCookies } from 'better-auth/cookies';
 import type { Auth } from '@/auth/auth.factory.js';
-import { SESSION_SCHEME } from '@/auth/session-docs.decorator.js';
+import {
+  BEARER_SCHEME,
+  SESSION_SCHEME,
+} from '@/auth/session-docs.decorator.js';
 import { contractComponents } from '@/contract/openapi.js';
 import { PROTOCOL_VERSION } from '@/contract/protocol.js';
 
@@ -31,6 +34,14 @@ export function setupDocs(app: INestApplication): void {
       cookie,
       { type: 'apiKey', in: 'cookie', name: cookie },
       SESSION_SCHEME,
+    )
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        description: 'The set-auth-token value',
+      },
+      BEARER_SCHEME,
     )
     .build();
 

@@ -9,7 +9,7 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ApiOkResponse } from '@nestjs/swagger';
+import { ApiOkResponse, type ApiResponseOptions } from '@nestjs/swagger';
 import { map, type Observable } from 'rxjs';
 import { z } from 'zod';
 import { ApiException, SERVER_ERROR_MESSAGE } from '@/common/api-exception.js';
@@ -45,12 +45,17 @@ export function failureDoc() {
   };
 }
 
+type ResponseHeaders = NonNullable<ApiResponseOptions['headers']>;
+
 // Every success is 200, POST included, as documented
-export function ContractResponse(schema: z.ZodType) {
+export function ContractResponse(
+  schema: z.ZodType,
+  { headers }: { headers?: ResponseHeaders } = {},
+) {
   return applyDecorators(
     ResponseSchema(schema),
     HttpCode(HttpStatus.OK),
-    ApiOkResponse({ schema: successDoc(schema) }),
+    ApiOkResponse({ schema: successDoc(schema), headers }),
   );
 }
 

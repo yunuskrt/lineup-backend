@@ -3,8 +3,13 @@ import { ApiBody, ApiTags } from '@nestjs/swagger';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { AuthFlowService, type WithCookies } from '@/auth/auth-flow.service.js';
+import {
+  AUTH_TOKEN_HEADER,
+  AuthFlowService,
+  type WithCookies,
+} from '@/auth/auth-flow.service.js';
 import { Public } from '@/auth/public.decorator.js';
+import { AUTH_TOKEN_DOC } from '@/auth/session-docs.decorator.js';
 import { ContractResponse } from '@/common/contract-response.js';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe.js';
 import {
@@ -21,9 +26,13 @@ import { componentRef } from '@/contract/openapi.js';
 
 const headersOf = (req: Request) => fromNodeHeaders(req.headers);
 
-// Forwards Better Auth's cookies, returns the data
-function sendCookies<T>(res: Response, { data, cookies }: WithCookies<T>): T {
+// Forwards the cookie and token; returns the data
+function sendCookies<T>(
+  res: Response,
+  { data, cookies, authToken }: WithCookies<T>,
+): T {
   if (cookies.length > 0) res.append('Set-Cookie', cookies);
+  if (authToken) res.setHeader(AUTH_TOKEN_HEADER, authToken);
   return data;
 }
 
@@ -45,7 +54,7 @@ export class AuthController {
 
   @Post('sign-up')
   @ApiBody({ schema: { $ref: componentRef('SignUpRequest') } })
-  @ContractResponse(sessionSchema)
+  @ContractResponse(sessionSchema, { headers: AUTH_TOKEN_DOC })
   async signUp(
     @Body(new ZodValidationPipe(signUpRequestSchema)) body: SignUpRequest,
     @Req() req: Request,
@@ -56,7 +65,7 @@ export class AuthController {
 
   @Post('sign-in')
   @ApiBody({ schema: { $ref: componentRef('SignInRequest') } })
-  @ContractResponse(sessionSchema)
+  @ContractResponse(sessionSchema, { headers: AUTH_TOKEN_DOC })
   async signIn(
     @Body(new ZodValidationPipe(signInRequestSchema)) body: SignInRequest,
     @Req() req: Request,
@@ -66,14 +75,14 @@ export class AuthController {
   }
 
   @Post('guest')
-  @ContractResponse(sessionSchema)
+  @ContractResponse(sessionSchema, { headers: AUTH_TOKEN_DOC })
   async guest(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return sendCookies(res, await this.auth.continueAsGuest(headersOf(req)));
   }
 
   @Post('upgrade')
   @ApiBody({ schema: { $ref: componentRef('UpgradeGuestRequest') } })
-  @ContractResponse(sessionSchema)
+  @ContractResponse(sessionSchema, { headers: AUTH_TOKEN_DOC })
   async upgrade(
     @Body(new ZodValidationPipe(upgradeGuestRequestSchema))
     body: UpgradeGuestRequest,

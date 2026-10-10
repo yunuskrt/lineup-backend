@@ -30,3 +30,4 @@ Not Started
 - B12b Gateway JWT: GET /auth/token, 5-min sub-only JWT, auth_jwks table
 - B13a CORS & Origin Check: own CORS, origin-checked writes, COOKIE_DOMAIN
 - B13b Bearer for Mobile: signed bearer tokens, set-auth-token header
+- B14a Profile & Stats: GET /profile, users module, zero stats when no row

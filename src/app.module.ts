@@ -1,8 +1,13 @@
-import { Module } from '@nestjs/common';
+import {
+  type MiddlewareConsumer,
+  Module,
+  type NestModule,
+} from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthModule } from '@/auth/auth.module.js';
 import { ContractResponseInterceptor } from '@/common/contract-response.js';
 import { EnvelopeExceptionFilter } from '@/common/envelope-exception.filter.js';
+import { OriginCheckMiddleware } from '@/common/origin-check.middleware.js';
 import { ConfigModule } from '@/config/config.module.js';
 import { PrismaModule } from '@/prisma/prisma.module.js';
 
@@ -13,4 +18,8 @@ import { PrismaModule } from '@/prisma/prisma.module.js';
     { provide: APP_INTERCEPTOR, useClass: ContractResponseInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(OriginCheckMiddleware).forRoutes('*path');
+  }
+}

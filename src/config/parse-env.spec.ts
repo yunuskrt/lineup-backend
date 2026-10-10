@@ -6,6 +6,11 @@ const BETTER_AUTH_URL = 'http://localhost:8080';
 const WEB_APP_URL = 'http://localhost:3000';
 const MAIL_FROM = 'Lineup <onboarding@resend.dev>';
 const RESEND_API_KEY = 're_test_key';
+// Production refuses plain http
+const HTTPS = {
+  BETTER_AUTH_URL: 'https://api.lineup.gg',
+  WEB_APP_URL: 'https://app.lineup.gg',
+};
 const base = {
   DATABASE_URL,
   BETTER_AUTH_SECRET,
@@ -23,7 +28,7 @@ describe('parseEnv', () => {
   });
 
   it('coerces PORT to a number', () => {
-    const prod = { ...base, NODE_ENV: 'production', RESEND_API_KEY };
+    const prod = { ...base, ...HTTPS, NODE_ENV: 'production', RESEND_API_KEY };
     const result = parseEnv({ ...prod, PORT: '8090' });
     expect(result).toEqual({ success: true, data: { ...prod, PORT: 8090 } });
   });
@@ -134,12 +139,13 @@ describe('parseEnv', () => {
     });
 
     it('requires RESEND_API_KEY in production', () => {
-      const result = parseEnv({ ...base, NODE_ENV: 'production' });
+      const result = parseEnv({ ...base, ...HTTPS, NODE_ENV: 'production' });
       expect(!result.success && result.error).toEqual([
         { key: 'RESEND_API_KEY', reason: 'Required in production' },
       ]);
       expect(
-        parseEnv({ ...base, NODE_ENV: 'production', RESEND_API_KEY }).success,
+        parseEnv({ ...base, ...HTTPS, NODE_ENV: 'production', RESEND_API_KEY })
+          .success,
       ).toBe(true);
     });
 
@@ -180,6 +186,92 @@ describe('parseEnv', () => {
     expect(!result.success && result.error.map((i) => i.key)).toEqual([
       'BETTER_AUTH_URL',
     ]);
+  });
+
+  describe('COOKIE_DOMAIN', () => {
+    const live = { ...base, ...HTTPS };
+
+    it('is optional, and absent by default', () => {
+      const result = parseEnv(base);
+      expect(result.success && result.data.COOKIE_DOMAIN).toBeUndefined();
+    });
+
+    it.each([
+      ['the shared parent', 'lineup.gg', 'lineup.gg'],
+      ['a leading dot, dropped', '.lineup.gg', 'lineup.gg'],
+      ['upper case, lowered', 'LineUp.GG', 'lineup.gg'],
+    ])('accepts %s', (_, domain, stored) => {
+      const result = parseEnv({ ...live, COOKIE_DOMAIN: domain });
+      expect(result.success && result.data.COOKIE_DOMAIN).toBe(stored);
+    });
+
+    it('accepts the exact host when both URLs share it', () => {
+      const same = {
+        ...base,
+        BETTER_AUTH_URL: 'https://lineup.gg',
+        WEB_APP_URL: 'https://lineup.gg',
+      };
+      expect(parseEnv({ ...same, COOKIE_DOMAIN: 'lineup.gg' }).success).toBe(
+        true,
+      );
+    });
+
+    it.each([
+      ['a domain neither host sits under', 'example.com'],
+      ['a host only the API has', 'api.lineup.gg'],
+      ['a lookalike suffix', 'ineup.gg'],
+    ])('refuses %s', (_, domain) => {
+      const result = parseEnv({ ...live, COOKIE_DOMAIN: domain });
+      expect(!result.success && result.error.map((i) => i.key)).toEqual([
+        'COOKIE_DOMAIN',
+      ]);
+    });
+
+    it.each([
+      ['a bare top-level domain', 'gg'],
+      ['a URL', 'https://lineup.gg'],
+      ['a port', 'lineup.gg:443'],
+      ['an empty string', ''],
+    ])('refuses %s as a domain', (_, domain) => {
+      const result = parseEnv({ ...live, COOKIE_DOMAIN: domain });
+      expect(!result.success && result.error.map((i) => i.key)).toEqual([
+        'COOKIE_DOMAIN',
+      ]);
+    });
+  });
+
+  it('reports a bad URL on its own key, without throwing', () => {
+    const result = parseEnv({
+      ...base,
+      ...HTTPS,
+      BETTER_AUTH_URL: 'not a url',
+      COOKIE_DOMAIN: 'lineup.gg',
+    });
+    expect(!result.success && result.error.map((i) => i.key)).toEqual([
+      'BETTER_AUTH_URL',
+    ]);
+  });
+
+  describe('https in production', () => {
+    const prod = { ...base, ...HTTPS, NODE_ENV: 'production', RESEND_API_KEY };
+
+    it('accepts https on both URLs', () => {
+      expect(parseEnv(prod).success).toBe(true);
+    });
+
+    it.each(['BETTER_AUTH_URL', 'WEB_APP_URL'])(
+      'refuses plain http for %s',
+      (key) => {
+        const result = parseEnv({ ...prod, [key]: 'http://lineup.gg' });
+        expect(!result.success && result.error).toEqual([
+          { key, reason: 'Production needs https' },
+        ]);
+      },
+    );
+
+    it('allows plain http outside production', () => {
+      expect(parseEnv({ ...base, NODE_ENV: 'development' }).success).toBe(true);
+    });
   });
 
   it('never echoes a rejected value', () => {

@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '@/app.module.js';
+import { applyCors } from '@/config/cors.js';
 import { loadEnv } from '@/config/load-env.js';
 import { formatEnvIssues } from '@/config/parse-env.js';
 import { setupDocs } from '@/docs/setup-docs.js';
@@ -17,6 +18,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   // Lets SIGTERM close the database pool cleanly
   app.enableShutdownHooks();
+  applyCors(app, env.data);
   setupDocs(app);
   await app.listen(env.data.PORT);
 }

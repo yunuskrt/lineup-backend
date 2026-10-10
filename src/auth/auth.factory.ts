@@ -109,6 +109,10 @@ export function createAuth(prisma: PrismaService, env: Env, mailer: Mailer) {
       database: { generateId: false },
       // Off by default under test; keep tests like prod
       disableOriginCheck: false,
+      // Set: the cookie reaches every host under it
+      ...(env.COOKIE_DOMAIN && {
+        crossSubDomainCookies: { enabled: true, domain: env.COOKIE_DOMAIN },
+      }),
     },
     // Clients use /auth/*, which applies the handle rules
     disabledPaths: [

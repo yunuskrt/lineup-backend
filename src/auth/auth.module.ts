@@ -22,6 +22,8 @@ import { PrismaService } from '@/prisma/prisma.service.js';
       inject: [PrismaService, ENV, MAILER],
       useFactory: (prisma: PrismaService, env: Env, mailer: Mailer) => ({
         auth: createAuth(prisma, env, mailer),
+        // CORS is ours: src/config/cors.ts, in main.ts
+        disableTrustedOriginsCors: true,
         // JSON only: a form post can't sign anyone in
         bodyParser: {
           json: { limit: '16kb' },

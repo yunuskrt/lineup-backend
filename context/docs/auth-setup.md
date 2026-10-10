@@ -17,7 +17,7 @@ Sign-in methods: **email + password** and **continue as guest**. There is no soc
 | **Before B11b** | [Email Verification](#email-verification) Steps 4–5: Resend account, API key, `.env` keys | Free tier |
 | **After B11b** | [Email Verification](#email-verification) Steps 6–8: test the verification mail | — |
 | Before B45 | [Email Verification](#email-verification) Step 9: verify a sending domain | Free tier |
-| B13 | Web origin and cookie domain | — |
+| **After B13a** | [CORS & Cookies](#cors--cookies): check CORS and the origin check; `COOKIE_DOMAIN` only for production | — |
 | B45 | Production secret and URL on the host | — |
 
 Better Auth needs no account. It's a library that runs inside the backend and writes to your Neon database.
@@ -236,6 +236,80 @@ Needed before real players sign up: until then, mail to anyone but you is refuse
 
 ---
 
+## CORS & Cookies
+
+From B13a, the browser-facing boundary is set in one place and tested.
+
+- **CORS** (`src/config/cors.ts`): only `WEB_APP_URL` may call the API with credentials, using only `GET` and `POST`, and only the `Content-Type` and `Authorization` headers. Any other origin gets no `Access-Control-Allow-Origin`, so the browser blocks it.
+- **Origin check:** a write (`POST` and the like) from any page other than the web app or the API's own Swagger page is refused with `403 forbidden` ("Request refused."), whether or not it carries the cookie. A write with no `Origin` header at all (curl, servers, the mobile app) isn't affected.
+- **The session cookie** is `HttpOnly; SameSite=Lax`, and host-only by default. Over HTTPS, Better Auth adds `Secure` and names it `__Secure-lineup.session_token`.
+
+### When each step is needed
+
+| Stage | Step | Why |
+| --- | --- | --- |
+| **After B13a** | Step 10: see CORS and the origin check with curl | Proves only the web app is trusted |
+| Before B45 | Step 11: decide `COOKIE_DOMAIN` for production | Only needed if the web app's own server must read the session |
+
+### Step 10 — See CORS and the origin check (after B13a)
+
+Start the server with `npm run start:dev`.
+
+```bash
+# A preflight from the web app: allowed
+curl -s -o /dev/null -D - -X OPTIONS \
+  -H 'Origin: http://localhost:3000' -H 'Access-Control-Request-Method: POST' \
+  http://localhost:8080/auth/sign-in | grep -i '^access-control'
+
+# The same from another site: no allow header, so a browser blocks it
+curl -s -o /dev/null -D - -X OPTIONS \
+  -H 'Origin: https://evil.example' -H 'Access-Control-Request-Method: POST' \
+  http://localhost:8080/auth/sign-in | grep -i '^access-control'
+```
+
+**What to expect:**
+
+- The first prints `Access-Control-Allow-Origin: http://localhost:3000`, `Access-Control-Allow-Credentials: true`, `Access-Control-Allow-Methods: GET,POST`, `Access-Control-Allow-Headers: Content-Type,Authorization` and `Access-Control-Max-Age: 600`
+- The second prints no `Access-Control-Allow-Origin` line
+
+Then the origin check, with a signed-in cookie:
+
+```bash
+curl -s -c /tmp/cors.jar -X POST http://localhost:8080/auth/guest
+
+# A cookie write "from" another site: refused, and you stay signed in
+curl -s -b /tmp/cors.jar -H 'Origin: https://evil.example' -X POST http://localhost:8080/auth/sign-out
+curl -s -b /tmp/cors.jar http://localhost:8080/auth/session
+
+# The same from the web app: allowed
+curl -s -b /tmp/cors.jar -H 'Origin: http://localhost:3000' -X POST http://localhost:8080/auth/sign-out
+
+# Even with no cookie, a write from another site is refused
+curl -s -H 'Origin: https://evil.example' -X POST http://localhost:8080/auth/guest
+```
+
+**What to expect:**
+
+- The first sign-out returns `403` with `"code": "forbidden"` and `"message": "Request refused."`, and the session still reads as the guest. The second signs out.
+- The last call also returns `403`, and creates no guest. Without that, any site could submit a hidden form to `/auth/guest` and swap a signed-in player's cookie for a new guest's.
+
+**Clean up:** `rm /tmp/cors.jar`, and delete the guest in Prisma Studio.
+
+### Step 11 — Decide `COOKIE_DOMAIN` (before B45)
+
+Leave it **unset** in development: the cookie stays on `localhost`, and `localhost:3000` and `localhost:8080` count as the same site, so the browser sends it.
+
+In production, with the API on `api.lineup.gg` and the web app on `app.lineup.gg`:
+
+- **Unset (host-only):** the browser still sends the API's cookie on the web app's requests, because both are on `lineup.gg`. This is enough for everything the web app does through the API.
+- **`COOKIE_DOMAIN="lineup.gg"`:** the cookie also reaches the Next.js server on `app.lineup.gg`, so it can read the session for server-side redirects. It also reaches every other subdomain of `lineup.gg`.
+
+The server refuses to boot if `COOKIE_DOMAIN` doesn't cover the hosts of both `BETTER_AUTH_URL` and `WEB_APP_URL`, or isn't a real domain (`lineup.gg`, not `gg` or `https://lineup.gg`).
+
+**Staging:** host it the same way, on one parent domain. A web app on `*.vercel.app` talking to an API on `*.up.railway.app` crosses sites, so `SameSite=Lax` cookies aren't sent and nobody stays signed in.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -243,7 +317,11 @@ Needed before real players sign up: until then, mail to anyone but you is refuse
 | Boot fails naming `BETTER_AUTH_SECRET` | Missing, or shorter than 32 characters |
 | Boot fails naming `BETTER_AUTH_URL` | Missing, or not a full URL (`http://localhost:8080`) |
 | `/auth/session` returns `null` right after sign-up | curl wasn't given the cookie file (`-b /tmp/lineup.jar`) |
-| The browser app can't stay signed in | Expected until B13 sets up cross-origin cookies; test with curl |
+| The browser app can't stay signed in | The web app and API aren't on the same site (Step 11), or `WEB_APP_URL` doesn't match the web app's exact origin, scheme and port included |
+| The browser blocks a request with a CORS error | The page's origin isn't exactly `WEB_APP_URL`, or the request uses a method or header outside `GET`/`POST` and `Content-Type`/`Authorization` |
+| A POST returns `403` "Request refused." | It came from a page other than the web app or Swagger, with or without a cookie (Step 10) |
+| Boot fails naming `COOKIE_DOMAIN` | It doesn't cover both hosts, or isn't a domain like `lineup.gg` (Step 11) |
+| Boot fails with "Production needs https" | `NODE_ENV=production` with an `http://` `BETTER_AUTH_URL` or `WEB_APP_URL` |
 | Boot fails naming `WEB_APP_URL` or `MAIL_FROM` | Missing from `.env` (Step 5) |
 | Boot fails naming `RESEND_API_KEY` | `NODE_ENV=production` without a key, or a key that doesn't start with `re_` (an empty string included). Comment the line out instead. |
 | Sign-up works but no mail arrives | Signed up with an address other than your Resend account's (Step 4). Check **Emails** in Resend, and the server log for a refused send. |
@@ -261,10 +339,8 @@ Needed before real players sign up: until then, mail to anyone but you is refuse
   - continue as guest: `POST /auth/guest`, which needs no setup
   - upgrade a guest to an email account without losing history (`POST /auth/upgrade`, same user id)
 - **B11b:** email verification, set up and tested per [Email Verification](#email-verification). Password reset comes in a later phase.
-- **B13:**
-  - the web origin (`http://localhost:3000`, later `https://app.lineup.gg`) is trusted for CORS
-  - the cookie is scoped to the parent domain
-  - mobile gets bearer tokens
+- **B13a:** CORS, the origin check and `COOKIE_DOMAIN`, per [CORS & Cookies](#cors--cookies).
+- **B13b:** mobile gets bearer tokens.
 - **B45:** set a new `BETTER_AUTH_SECRET` and the production `BETTER_AUTH_URL` (`https://api.lineup.gg`) on the host.
 - **Mobile project:** the `@better-auth/expo` plugin and the app's deep-link scheme.
 

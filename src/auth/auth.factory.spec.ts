@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { getCookies } from 'better-auth/cookies';
 import {
   createAuth,
   GATEWAY_TOKEN_LIFETIME,
@@ -46,6 +47,36 @@ describe('createAuth', () => {
     expect(options.advanced).toMatchObject({
       cookiePrefix: 'lineup',
       database: { generateId: false },
+    });
+  });
+
+  it('names the cookie __Secure- over https only', () => {
+    const over = (url: string) =>
+      getCookies(
+        createAuth(
+          new PrismaService(env),
+          { ...env, BETTER_AUTH_URL: url },
+          mailer,
+        ).options,
+      ).sessionToken.name;
+
+    expect(over('http://localhost:8080')).toBe('lineup.session_token');
+    expect(over('https://api.lineup.gg')).toBe('__Secure-lineup.session_token');
+  });
+
+  it('keeps the cookie host-only without COOKIE_DOMAIN', () => {
+    expect(options.advanced).not.toHaveProperty('crossSubDomainCookies');
+  });
+
+  it('scopes the cookie to COOKIE_DOMAIN when set', () => {
+    const scoped = createAuth(
+      new PrismaService(env),
+      { ...env, COOKIE_DOMAIN: 'lineup.gg' },
+      mailer,
+    );
+    expect(scoped.options.advanced?.crossSubDomainCookies).toEqual({
+      enabled: true,
+      domain: 'lineup.gg',
     });
   });
 

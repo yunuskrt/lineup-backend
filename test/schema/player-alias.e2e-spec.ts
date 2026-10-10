@@ -4,6 +4,15 @@ import {
   violation,
 } from '@test/schema/schema-test-utils.js';
 
+const OWN_PLAYER_SLUGS = [
+  'test-pennock',
+  'test-odonovan',
+  'test-dean-harlow',
+  'test-rhys-harlow',
+  'test-ibra',
+  'test-blank',
+];
+
 describe('Player & alias schema (e2e)', () => {
   const { rolledBack, prisma } = useRolledBackDb();
 
@@ -48,9 +57,10 @@ describe('Player & alias schema (e2e)', () => {
     ]);
   });
 
+  // Only its own slugs: other suites commit test- rows
   it('leaves no rows behind', async () => {
     const leftovers = await prisma().player.count({
-      where: { slug: { startsWith: 'test-' } },
+      where: { slug: { in: OWN_PLAYER_SLUGS } },
     });
     expect(leftovers).toBe(0);
   });

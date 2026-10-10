@@ -4,6 +4,18 @@ import {
   violation,
 } from '@test/schema/schema-test-utils.js';
 
+const OWN_CLUB_SLUGS = [
+  'test-northgate',
+  'test-yildirimspor',
+  'test-nation',
+  'test-a',
+  'test-b',
+  'test-united-a',
+  'test-united-b',
+  'test-cascade',
+  'test-blank',
+];
+
 describe('Club & competition schema (e2e)', () => {
   const { rolledBack, prisma } = useRolledBackDb();
 
@@ -72,9 +84,10 @@ describe('Club & competition schema (e2e)', () => {
     expect(read.nations).toBeGreaterThanOrEqual(1);
   });
 
+  // Only its own slugs: other suites commit test- rows
   it('leaves no rows behind', async () => {
     const leftovers = await prisma().club.count({
-      where: { slug: { startsWith: 'test-' } },
+      where: { slug: { in: OWN_CLUB_SLUGS } },
     });
     expect(leftovers).toBe(0);
   });

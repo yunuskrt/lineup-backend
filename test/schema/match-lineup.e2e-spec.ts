@@ -83,9 +83,10 @@ describe('Match & lineup schema (e2e)', () => {
     ]);
   });
 
+  // Only its own slug: other suites commit test- rows
   it('leaves no rows behind', async () => {
     const leftovers = await prisma().match.count({
-      where: { slug: { startsWith: 'test-' } },
+      where: { slug: 'test-mudbath-derby' },
     });
     expect(leftovers).toBe(0);
   });

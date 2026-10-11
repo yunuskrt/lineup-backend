@@ -9,11 +9,12 @@ import { ContractResponseInterceptor } from '@/common/contract-response.js';
 import { EnvelopeExceptionFilter } from '@/common/envelope-exception.filter.js';
 import { OriginCheckMiddleware } from '@/common/origin-check.middleware.js';
 import { ConfigModule } from '@/config/config.module.js';
+import { MatchesModule } from '@/matches/matches.module.js';
 import { PrismaModule } from '@/prisma/prisma.module.js';
 import { UsersModule } from '@/users/users.module.js';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, AuthModule, UsersModule],
+  imports: [ConfigModule, PrismaModule, AuthModule, UsersModule, MatchesModule],
   providers: [
     { provide: APP_FILTER, useClass: EnvelopeExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: ContractResponseInterceptor },

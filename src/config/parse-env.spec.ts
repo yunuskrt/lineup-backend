@@ -23,14 +23,22 @@ describe('parseEnv', () => {
   it('applies defaults when optional keys are unset', () => {
     expect(parseEnv(base)).toEqual({
       success: true,
-      data: { NODE_ENV: 'development', PORT: 8080, ...base },
+      data: {
+        NODE_ENV: 'development',
+        PORT: 8080,
+        MATCH_POOL_INCLUDE_UNSCORED: false,
+        ...base,
+      },
     });
   });
 
   it('coerces PORT to a number', () => {
     const prod = { ...base, ...HTTPS, NODE_ENV: 'production', RESEND_API_KEY };
     const result = parseEnv({ ...prod, PORT: '8090' });
-    expect(result).toEqual({ success: true, data: { ...prod, PORT: 8090 } });
+    expect(result).toEqual({
+      success: true,
+      data: { ...prod, PORT: 8090, MATCH_POOL_INCLUDE_UNSCORED: false },
+    });
   });
 
   it('ignores keys outside the schema', () => {
@@ -271,6 +279,47 @@ describe('parseEnv', () => {
 
     it('allows plain http outside production', () => {
       expect(parseEnv({ ...base, NODE_ENV: 'development' }).success).toBe(true);
+    });
+  });
+
+  describe('MATCH_POOL_INCLUDE_UNSCORED', () => {
+    const prod = { ...base, ...HTTPS, NODE_ENV: 'production', RESEND_API_KEY };
+
+    it.each([
+      ['true', true],
+      ['false', false],
+      ['1', true],
+      ['0', false],
+    ])('parses %s outside production', (raw, flag) => {
+      const result = parseEnv({ ...base, MATCH_POOL_INCLUDE_UNSCORED: raw });
+      expect(result.success && result.data.MATCH_POOL_INCLUDE_UNSCORED).toBe(
+        flag,
+      );
+    });
+
+    it.each(['', 'maybe'])('rejects %j', (raw) => {
+      const result = parseEnv({ ...base, MATCH_POOL_INCLUDE_UNSCORED: raw });
+      expect(!result.success && result.error.map((i) => i.key)).toEqual([
+        'MATCH_POOL_INCLUDE_UNSCORED',
+      ]);
+    });
+
+    it('is refused as true in production', () => {
+      const result = parseEnv({ ...prod, MATCH_POOL_INCLUDE_UNSCORED: 'true' });
+      expect(!result.success && result.error).toEqual([
+        {
+          key: 'MATCH_POOL_INCLUDE_UNSCORED',
+          reason: 'Must be false in production',
+        },
+      ]);
+    });
+
+    it('is allowed as false in production', () => {
+      const result = parseEnv({
+        ...prod,
+        MATCH_POOL_INCLUDE_UNSCORED: 'false',
+      });
+      expect(result.success).toBe(true);
     });
   });
 

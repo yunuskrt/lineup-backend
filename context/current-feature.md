@@ -32,3 +32,4 @@ Not Started
 - B13b Bearer for Mobile: signed bearer tokens, set-auth-token header
 - B14a Profile & Stats: GET /profile, users module, zero stats when no row
 - B14b Profile History: GET /profile/history, keyset cursor, MatchIdentity
+- B25 Match Selector: sqrt-stratified pool, dev unscored flag, empty blame

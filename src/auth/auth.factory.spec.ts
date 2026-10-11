@@ -24,6 +24,7 @@ const env: Env = {
   BETTER_AUTH_URL: 'http://localhost:8080',
   WEB_APP_URL: 'http://localhost:3000',
   MAIL_FROM: 'Lineup <onboarding@resend.dev>',
+  MATCH_POOL_INCLUDE_UNSCORED: false,
 };
 
 describe('createAuth', () => {

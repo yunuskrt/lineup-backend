@@ -44,6 +44,8 @@ export const envSchema = z
       .transform((domain) => domain.replace(/^\./, ''))
       .pipe(z.string().regex(DOMAIN, 'A domain like lineup.gg'))
       .optional(),
+    // Dev only: unscored mock matches join the pool
+    MATCH_POOL_INCLUDE_UNSCORED: z.stringbool().default(false),
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.RESEND_API_KEY, {
     path: ['RESEND_API_KEY'],
@@ -71,6 +73,15 @@ export const envSchema = z
   .refine((env) => env.NODE_ENV !== 'production' || isHttps(env.WEB_APP_URL), {
     path: ['WEB_APP_URL'],
     message: 'Production needs https',
-  });
+  })
+  // HC 13: production serves scored matches only
+  .refine(
+    (env) => env.NODE_ENV !== 'production' || !env.MATCH_POOL_INCLUDE_UNSCORED,
+    {
+      path: ['MATCH_POOL_INCLUDE_UNSCORED'],
+      message: 'Must be false in production',
+      when: () => true,
+    },
+  );
 
 export type Env = z.infer<typeof envSchema>;

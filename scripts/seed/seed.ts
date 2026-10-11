@@ -1,3 +1,4 @@
+import { normalizeName } from '@/game/normalize.js';
 import type { Prisma } from '@/generated/prisma/client.js';
 import { CLUBS } from '@scripts/seed/data/clubs.js';
 import { COMPETITIONS } from '@scripts/seed/data/competitions.js';
@@ -167,7 +168,6 @@ async function syncPlayers(tx: Tx, data: SeedData): Promise<Synced> {
   });
 }
 
-// Mock aliases are already normalized (B27 checks)
 async function syncAliases(
   tx: Tx,
   data: SeedData,
@@ -177,7 +177,7 @@ async function syncAliases(
     p.aliases.map((alias) => ({
       playerId: idFor(playerIds, p.id),
       alias,
-      normalized: alias,
+      normalized: normalizeName(alias),
     })),
   );
   const stored = await tx.playerAlias.findMany({

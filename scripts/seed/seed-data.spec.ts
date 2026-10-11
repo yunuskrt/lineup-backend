@@ -1,4 +1,5 @@
 import { SQUAD_SIZE } from '@/contract/constants.js';
+import { normalizeName } from '@/game/normalize.js';
 import {
   type SeedDataInput,
   seasonIssue,
@@ -57,6 +58,16 @@ describe('seed data', () => {
         expect(keeper?.slot).toBe(0);
       }
     }
+  });
+
+  // B06/B09: the web mock and B27 must agree
+  it('stores every alias already in normalized form', () => {
+    const drifted = data.players.flatMap((p, i) =>
+      p.aliases.flatMap((alias, j) =>
+        normalizeName(alias) === alias ? [] : [`players[${i}].aliases[${j}]`],
+      ),
+    );
+    expect(drifted).toEqual([]);
   });
 
   it('keeps a shared surname on two players', () => {
@@ -118,18 +129,26 @@ describe('seed data', () => {
         'Duplicate id',
       ],
       [
-        'an uppercase alias',
+        'an alias with no letters',
         (i) => {
-          i.players[0].aliases.push('Pennock');
+          i.players[0].aliases.push('!!!');
         },
-        'Alias must be lowercase',
+        'Alias must normalize to a name',
       ],
       [
         'a duplicate alias',
         (i) => {
           i.players[0].aliases.push(i.players[0].aliases[0]);
         },
-        'Aliases must be unique',
+        'Aliases must not normalize alike',
+      ],
+      [
+        'two aliases that normalize alike',
+        (i) => {
+          const first = i.players[0].aliases[0];
+          i.players[0].aliases.push(first.toUpperCase());
+        },
+        'Aliases must not normalize alike',
       ],
       [
         'an unknown competition',
@@ -142,15 +161,19 @@ describe('seed data', () => {
       expect(issuesOf(edited(change))).toContain(message);
     });
 
-    it.each(['double  space', ' leading', 'trailing ', ''])(
-      'the alias %j',
-      (alias) => {
-        const input = edited((i) => {
-          i.players[0].aliases.push(alias);
-        });
-        expect(seedDataSchema.safeParse(input).success).toBe(false);
-      },
-    );
+    it.each(['', '   ', '-—–', 'Аршавин'])('the alias %j', (alias) => {
+      const input = edited((i) => {
+        i.players[0].aliases.push(alias);
+      });
+      expect(seedDataSchema.safeParse(input).success).toBe(false);
+    });
+
+    it('accepts a raw alias the pipeline can normalize', () => {
+      const input = edited((i) => {
+        i.players[0].aliases.push('  Ünal-Ödemiş ');
+      });
+      expect(seedDataSchema.safeParse(input).success).toBe(true);
+    });
   });
 
   describe('seasonIssue()', () => {

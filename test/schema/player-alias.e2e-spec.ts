@@ -132,6 +132,11 @@ describe('Player & alias schema (e2e)', () => {
       ['a double space', 'o  donovan'],
       ['a tab', 'o\tdonovan'],
       ['an empty string', ''],
+      // B27: the ASCII alphabet of normalizeName
+      ['a diacritic', 'ibrahimović'],
+      ['a non-Latin letter', 'аршавин'],
+      ['an apostrophe', "o'shea"],
+      ['a hyphen', 'hernandez-perez'],
     ])('rejects a normalized alias with %s', async (_, normalized) => {
       // Valid raw alias: only `normalized` can fail
       await expect(

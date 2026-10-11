@@ -10,18 +10,16 @@ import {
   SQUAD_SIZE,
 } from '@/contract/constants.js';
 import { formationSchema } from '@/contract/match.js';
+import { normalizeName } from '@/game/normalize.js';
 
 const slugSchema = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
 
 const textSchema = z.string().regex(/\S/);
 
-// Mirrors player_aliases_normalized_check
-const normalizedAliasSchema = z
-  .string()
-  .regex(/^\S+( \S+)*$/)
-  .refine((alias) => alias === alias.toLowerCase(), {
-    error: 'Alias must be lowercase',
-  });
+// Stored as normalizeName(alias); never empty
+const aliasSchema = textSchema.refine((alias) => normalizeName(alias) !== '', {
+  error: 'Alias must normalize to a name',
+});
 
 const seasonLabelSchema = z.string().regex(/^\d{4}(-\d{2})?$/);
 
@@ -41,11 +39,13 @@ const seedPlayerSchema = z.object({
   id: slugSchema,
   name: textSchema,
   aliases: z
-    .array(normalizedAliasSchema)
+    .array(aliasSchema)
     .min(1)
-    .refine((aliases) => new Set(aliases).size === aliases.length, {
-      error: 'Aliases must be unique',
-    }),
+    // The (player_id, normalized) unique key
+    .refine(
+      (aliases) => new Set(aliases.map(normalizeName)).size === aliases.length,
+      { error: 'Aliases must not normalize alike' },
+    ),
 });
 
 const lineupEntrySchema = z.object({

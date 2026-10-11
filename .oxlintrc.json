@@ -7,7 +7,28 @@
   "env": {
     "node": true
   },
-  "ignorePatterns": [
-    "src/generated/**"
-  ]
+  "overrides": [
+    {
+      "files": ["src/game/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@nestjs/**",
+                  "@prisma/**",
+                  "@/generated/**",
+                  "@/prisma/**"
+                ],
+                "message": "src/game is pure: no NestJS or Prisma imports"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "ignorePatterns": ["src/generated/**"]
 }

@@ -6,6 +6,12 @@ Workflow per phase: `/todo current` → `/todo spec` → `/feature load <spec>` 
 
 This todo file is for developer-side use.
 
+**Order** (see `context/docs/build-order.md`):
+
+1. **Gameplay on the seeded mock data:** B25–B43.
+2. **Real data:** B15–B24 and B26. Phases tagged `→ scraper repo` move to a separate scraper repo; the backend loads its output. Re-spec them before starting.
+3. **Ops:** B44–B46, any time after B43.
+
 ## Backend (NestJS)
 
 - [x] **Phase B01 — Repo & Scaffold**: NestJS, strict TS, eslint and prettier, `bodyParser: false` at bootstrap.
@@ -22,19 +28,8 @@ This todo file is for developer-side use.
 - [x] **Phase B12 — Guards & JWT**: Route guards, session resolution and JWT issuance for the gateway.
 - [x] **Phase B13 — CORS & Cookies**: Credentialed CORS, parent-domain cookie scope, bearer for mobile.
 - [x] **Phase B14 — Users Module**: Profile, stats and guest-upgrade endpoints over the users schema.
-- [ ] **Phase B15 — Ingestion Harness**: Rerunnable runner with provider client, disk cache and rate limits.
-- [ ] **Phase B16 — Match Metadata Ingest**: Fixtures, scores, dates and competitions across 2000–2026.
-- [ ] **Phase B17 — Entity Resolution**: Normalize and dedupe clubs and players, then build base alias sets.
-- [ ] **Phase B18 — Cultural Footprint Signal**: Wikipedia and Wikidata article, pageview and nickname signals.
-- [ ] **Phase B19 — Memorability Engine**: Signal scoring with era-bucket normalization, pure and unit tested.
-- [ ] **Phase B20 — Lineup Ingest**: Pull full starting XIs for the shortlisted matches only.
-- [ ] **Phase B21 — Guessability Gate**: Hard filter requiring all 11 starters to resolve with alias sets.
-- [ ] **Phase B22 — Pool QA Report**: Script reporting pool size and coverage gaps per league, era and club.
-- [ ] **Phase B23 — Storage Module**: Bucket client behind an interface; Postgres holds keys, never binaries.
-- [ ] **Phase B24 — Image Ingest**: Player and crest images with licence checks and attribution recorded.
 - [ ] **Phase B25 — Match Selector**: Stratified sampling across league, era and club for filtered retrieval.
 - [ ] **Phase B25b — Catalog Endpoint**: Filter options (competitions, clubs, era range) from the pool.
-- [ ] **Phase B26 — Indexes & Performance**: Index the alias, match and lineup hot paths; measure trigram cost.
 - [ ] **Phase B27 — Name Normalization**: Unicode pipeline in `game/` with Turkish and diacritic handling.
 - [ ] **Phase B28 — Alias Matching**: Exact and fuzzy resolution with a tuned threshold, fully unit tested.
 - [ ] **Phase B29 — Squad Collision Rules**: Resolve ambiguous bare surnames within the current XI only.
@@ -52,6 +47,17 @@ This todo file is for developer-side use.
 - [ ] **Phase B41 — Duel Persistence**: Write duel sessions, rounds, guesses and results from the gateway.
 - [ ] **Phase B42 — Socket Rate Limiting**: Per-connection guess throttling outside the HTTP pipeline.
 - [ ] **Phase B43 — Duel Integration Harness**: Two simulated clients covering win, loss, draw and forfeit.
+- [ ] **Phase B15 — Ingestion Harness**: Rerunnable runner with provider client, disk cache and rate limits. → scraper repo
+- [ ] **Phase B16 — Match Metadata Ingest**: Fixtures, scores, dates and competitions across 2000–2026. → scraper repo
+- [ ] **Phase B17 — Entity Resolution**: Normalize and dedupe clubs and players, then build base alias sets. → scraper repo
+- [ ] **Phase B18 — Cultural Footprint Signal**: Wikipedia and Wikidata article, pageview and nickname signals. → either repo
+- [ ] **Phase B19 — Memorability Engine**: Signal scoring with era-bucket normalization, pure and unit tested.
+- [ ] **Phase B20 — Lineup Ingest**: Pull full starting XIs for the shortlisted matches only. → scraper repo
+- [ ] **Phase B21 — Guessability Gate**: Hard filter requiring all 11 starters to resolve with alias sets.
+- [ ] **Phase B22 — Pool QA Report**: Script reporting pool size and coverage gaps per league, era and club.
+- [ ] **Phase B23 — Storage Module**: Bucket client behind an interface; Postgres holds keys, never binaries.
+- [ ] **Phase B24 — Image Ingest**: Player and crest images with licence checks and attribution recorded.
+- [ ] **Phase B26 — Indexes & Performance**: Index the alias, match and lineup hot paths; measure trigram cost.
 - [ ] **Phase B44 — Observability**: Sentry, structured logs, health checks and draw-rate instrumentation.
 - [ ] **Phase B45 — Deployment**: Railway or Fly with `migrate deploy` before start, plus a staging env.
 - [ ] **Phase B46 — Redis Swap**: Move queue, sessions and rate limits to Upstash behind the same interfaces.
@@ -62,7 +68,7 @@ This todo file is for developer-side use.
 
 - [ ] **Phase P01 — Data Provider Trial**: Validate lineup coverage on 20 matches from 2001, 2006, 2011, 2019.
 
-Not blocking the web build, but it must resolve before **B20 (Lineup Ingest)** — its answer decides whether the 2000–2026 season range in the spec is honest, or whether the 2000s ship later as a curated Classics pack.
+Trial the chosen source (API-Football, or a site such as mackolik.com, after checking its terms). It can run any time and must resolve before **B16**. Its answer decides whether the 2000–2026 season range in the spec is honest, or whether the 2000s ship later as a curated Classics pack.
 
 ---
 

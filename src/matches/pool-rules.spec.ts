@@ -4,6 +4,7 @@ import {
   eraBucketOf,
   matchesFilters,
   type PoolCandidate,
+  poolCoverage,
   type Random,
   sampleStratified,
   selectFrom,
@@ -244,6 +245,42 @@ describe('selectFrom', () => {
     const filters = { ...ALL, clubIds: ['club-z'] };
     expect(selectFrom(pool, filters, Math.random)).toEqual({
       emptyBecause: 'club',
+    });
+  });
+});
+
+describe('poolCoverage', () => {
+  it('falls back to the full range for an empty pool', () => {
+    expect(poolCoverage([])).toEqual({
+      competitionIds: [],
+      clubIds: [],
+      era: { from: 2000, to: 2025 },
+    });
+  });
+
+  it('lists each competition and club once, both sides included', () => {
+    const coverage = poolCoverage([
+      candidate('m1'),
+      candidate('m2', { clubIds: ['club-b', 'club-c'] }),
+      candidate('m3', { competitionId: 'comp-b' }),
+    ]);
+    expect(coverage.competitionIds).toEqual(['comp-a', 'comp-b']);
+    expect(coverage.clubIds).toEqual(['club-a', 'club-b', 'club-c']);
+  });
+
+  it('spans the lowest and highest season start', () => {
+    const coverage = poolCoverage([
+      candidate('m1', { seasonStart: 2012 }),
+      candidate('m2', { seasonStart: 2003 }),
+      candidate('m3', { seasonStart: 2019 }),
+    ]);
+    expect(coverage.era).toEqual({ from: 2003, to: 2019 });
+  });
+
+  it('gives a one-season era for a one-season pool', () => {
+    expect(poolCoverage([candidate('m1')]).era).toEqual({
+      from: 2010,
+      to: 2010,
     });
   });
 });

@@ -33,3 +33,4 @@ Not Started
 - B14a Profile & Stats: GET /profile, users module, zero stats when no row
 - B14b Profile History: GET /profile/history, keyset cursor, MatchIdentity
 - B25 Match Selector: sqrt-stratified pool, dev unscored flag, empty blame
+- B25b Catalog Endpoint: public filter options from the pool, name-sorted

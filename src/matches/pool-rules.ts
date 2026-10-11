@@ -1,6 +1,7 @@
 import type { CompetitionKind } from '@/contract/common.js';
+import { FIRST_SEASON_START, LAST_SEASON_START } from '@/contract/constants.js';
 import type { EmptyPoolReason } from '@/contract/envelope.js';
-import type { Filters } from '@/contract/match.js';
+import type { EraRange, Filters } from '@/contract/match.js';
 
 // By season start year
 export const ERA_BUCKETS = [
@@ -29,6 +30,12 @@ export type MatchSelection =
   { matchId: string } | { emptyBecause: EmptyPoolReason };
 
 export type Random = () => number;
+
+export type PoolCoverage = {
+  competitionIds: string[];
+  clubIds: string[];
+  era: EraRange;
+};
 
 type FilterKey = Exclude<EmptyPoolReason, 'combination'>;
 
@@ -143,4 +150,22 @@ export function selectFrom(
   return picked
     ? { matchId: picked.matchId }
     : { emptyBecause: blame(candidates, filters) };
+}
+
+export function poolCoverage(
+  candidates: readonly PoolCandidate[],
+): PoolCoverage {
+  if (candidates.length === 0) {
+    return {
+      competitionIds: [],
+      clubIds: [],
+      era: { from: FIRST_SEASON_START, to: LAST_SEASON_START },
+    };
+  }
+  const starts = candidates.map((candidate) => candidate.seasonStart);
+  return {
+    competitionIds: [...new Set(candidates.map((c) => c.competitionId))],
+    clubIds: [...new Set(candidates.flatMap((c) => c.clubIds))],
+    era: { from: Math.min(...starts), to: Math.max(...starts) },
+  };
 }

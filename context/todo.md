@@ -29,7 +29,7 @@ This todo file is for developer-side use.
 - [x] **Phase B13 — CORS & Cookies**: Credentialed CORS, parent-domain cookie scope, bearer for mobile.
 - [x] **Phase B14 — Users Module**: Profile, stats and guest-upgrade endpoints over the users schema.
 - [x] **Phase B25 — Match Selector**: Stratified sampling across league, era and club for filtered retrieval.
-- [ ] **Phase B25b — Catalog Endpoint**: Filter options (competitions, clubs, era range) from the pool.
+- [x] **Phase B25b — Catalog Endpoint**: Filter options (competitions, clubs, era range) from the pool.
 - [ ] **Phase B27 — Name Normalization**: Unicode pipeline in `game/` with Turkish and diacritic handling.
 - [ ] **Phase B28 — Alias Matching**: Exact and fuzzy resolution with a tuned threshold, fully unit tested.
 - [ ] **Phase B29 — Squad Collision Rules**: Resolve ambiguous bare surnames within the current XI only.

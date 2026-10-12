@@ -70,7 +70,7 @@ Phases built on the mock data that need a second pass:
 | B27 Normalization | Check every real alias normalises to itself. Cover Turkish, Slavic and Nordic names |
 | B28 Alias Matching | Retune the `pg_trgm` threshold on real names. Keep "Ronaldo ≠ Ronaldinho" |
 | B29 Collisions | Test real surname clashes (two Silvas, two Nevilles) |
-| B32 Side Selection | Replace the mock fallback with real guessability and star power |
+| B32 Side Selection | B19 and B21 write `signals.sides.{home,away}.{starPower,guessability}` (each 0–1) into `memorability_scores`. Until then every pick is 50/50 |
 | B43 Harness | Rerun win, loss, draw and forfeit against real matches |
 
 ## Open points to close
@@ -86,4 +86,4 @@ Phases built on the mock data that need a second pass:
 1. **At B25:** the mock matches have no memorability scores (0 rows), so the selector's pool is empty. Either add a dev-only pool bypass, or run B19 and B21 on the mock data early.
 2. **Before item 4:** a fourth repo and scraping mackolik both change `project-overview.md`. Today that file names API-Football as the primary source, keeps ingestion in this repo, and rules out programmatic scraping of similar sites (ToS). Check mackolik's terms and `robots.txt`, then update the spec in all three repos.
 3. **After B43:** re-spec B15–B24 for the scraper split before starting them. `todo.md` already tags which phases move.
-4. **At B32:** the mock has no star-power data. Use a neutral fallback, such as an even home/away pick, until B18 and B19 exist.
+4. **At B32 (done):** the mock has no star-power data, so the pick is neutral (50/50) until B19 and B21 write the `sides` block.

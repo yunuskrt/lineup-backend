@@ -39,3 +39,4 @@ Not Started
 - B29 Squad Collision Rules: hybrid surname rule, classifyGuess verdicts
 - B30 Rules Engine: pure seat-based state machine, effects in contract order
 - B31 Server Timer Model: 15s+400ms deadlines, catch-up clock, late guess off
+- B32 Team Side Selection: neutral 50/50 until signals.sides, 30-70% tilt

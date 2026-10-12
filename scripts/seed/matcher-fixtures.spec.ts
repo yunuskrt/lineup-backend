@@ -1,3 +1,4 @@
+import { classifyGuess, squadCollisions } from '@/game/collisions.js';
 import {
   FUZZY_THRESHOLD,
   resolveGuess,
@@ -55,5 +56,30 @@ describe('matcher over the seeded XIs', () => {
       .filter((player) => resolveGuess(player.name, squad).kind !== 'miss')
       .map((player) => player.id);
     expect(falseHits).toEqual([]);
+  });
+});
+
+describe('collisions over the seeded XIs', () => {
+  it('holds only the two deliberate Harlow collisions', () => {
+    const collisions = XIS.flatMap(({ label, squad }) =>
+      squadCollisions(squad).map(({ playerIds }) => ({ label, playerIds })),
+    );
+    const harlows = ['pl-dean-harlow', 'pl-rhys-harlow'];
+    expect(collisions).toEqual([
+      { label: 'match-crown-2003 home', playerIds: harlows },
+      { label: 'match-continental-2005-final away', playerIds: harlows },
+    ]);
+  });
+
+  it.each(XIS)('clears $label by full names', ({ squad }) => {
+    const found: string[] = [];
+    for (const entry of squad) {
+      const name = PLAYER_BY_ID.get(entry.playerId)?.name ?? '';
+      const verdict = classifyGuess(name, squad, found);
+      if (verdict.kind === 'correct_new') found.push(verdict.playerId);
+    }
+    // Ids only: never a name in the output
+    expect(found).toEqual(squad.map((entry) => entry.playerId));
+    expect(found).toHaveLength(11);
   });
 });

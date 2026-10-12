@@ -36,3 +36,4 @@ Not Started
 - B25b Catalog Endpoint: public filter options from the pool, name-sorted
 - B27 Name Normalization: NFKD ASCII normalizeName, seed uses it, CHECK
 - B28 Alias Matching: exact + Damerau-Levenshtein 0.82, seeded-XI tuning
+- B29 Squad Collision Rules: hybrid surname rule, classifyGuess verdicts

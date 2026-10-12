@@ -33,7 +33,7 @@ This todo file is for developer-side use.
 - [x] **Phase B27 — Name Normalization**: Unicode pipeline in `game/` with Turkish and diacritic handling.
 - [x] **Phase B28 — Alias Matching**: Exact and fuzzy resolution with a tuned threshold, fully unit tested.
 - [x] **Phase B29 — Squad Collision Rules**: Resolve ambiguous bare surnames within the current XI only.
-- [ ] **Phase B30 — Rules Engine**: Lives, turn order and round resolution state machine, pure and tested.
+- [x] **Phase B30 — Rules Engine**: Lives, turn order and round resolution state machine, pure and tested.
 - [ ] **Phase B31 — Server Timer Model**: Server-owned 15s rounds with timestamps and a fixed grace window.
 - [ ] **Phase B32 — Team Side Selection**: Server-weighted home/away pick by guessability and star power.
 - [ ] **Phase B33 — Solo Endpoints**: Start, guess and end-run REST endpoints validating server-side only.

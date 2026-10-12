@@ -31,7 +31,7 @@ This todo file is for developer-side use.
 - [x] **Phase B25 — Match Selector**: Stratified sampling across league, era and club for filtered retrieval.
 - [x] **Phase B25b — Catalog Endpoint**: Filter options (competitions, clubs, era range) from the pool.
 - [x] **Phase B27 — Name Normalization**: Unicode pipeline in `game/` with Turkish and diacritic handling.
-- [ ] **Phase B28 — Alias Matching**: Exact and fuzzy resolution with a tuned threshold, fully unit tested.
+- [x] **Phase B28 — Alias Matching**: Exact and fuzzy resolution with a tuned threshold, fully unit tested.
 - [ ] **Phase B29 — Squad Collision Rules**: Resolve ambiguous bare surnames within the current XI only.
 - [ ] **Phase B30 — Rules Engine**: Lives, turn order and round resolution state machine, pure and tested.
 - [ ] **Phase B31 — Server Timer Model**: Server-owned 15s rounds with timestamps and a fixed grace window.

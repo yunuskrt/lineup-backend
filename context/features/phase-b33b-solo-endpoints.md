@@ -2,7 +2,7 @@
 
 ## Status
 
-Not Started
+Complete
 
 ## Goals
 
@@ -29,11 +29,11 @@ Not Started
 
 | # | Route | Body | Response | Does |
 | --- | --- | --- | --- | --- |
-| 8 | `POST /solo/sessions` | `Filters` | `SoloMatchOffer` | Selects a match and creates a run with no side and no clock |
+| 8 | `POST /solo/sessions` | `Filters` | `SoloMatchOffer` | Ends the user's open run (**Decisions**), selects a match and creates a run with no side and no clock |
 | 9 | `POST /solo/sessions/:sessionId/side` | `{ side }` | `SoloSession` | Loads the squad and starts round 1 now |
 | 10 | `POST /solo/sessions/:sessionId/guesses` | `SoloGuessRequest` | `SoloGuessResponse` | Applies a `guess` input |
 | 11 | `GET /solo/sessions/:sessionId` | — | `SoloSession` | Sends `tick` (the B31 note) |
-| 12 | `POST /solo/sessions/:sessionId/quit` | — | `SoloSummary` | Sends `quit` |
+| 12 | `POST /solo/sessions/:sessionId/quit` | — | `SoloSummary` | Sends `quit`; a run that has already ended returns its summary (**Decisions**) |
 | 13 | `GET /solo/sessions/:sessionId/summary` | — | `SoloSummary` | Sends `tick`, then reads the summary |
 
 - **Every call passes the server receipt time (`clock.now()`)** to `applyTimed`, so any expiry is applied first. Nothing is read from the client except the guess text, the side and the filters.
@@ -77,6 +77,8 @@ Cases:
   - a guess sent after the deadline gets `session_over`
 - **Three expiries:** the summary is `lives_out` with 0 lives
 - **Quit:** mid-run quit gives a summary with `quit` and the lives kept
+- **A new run ends the open one:** the old run's summary reads `quit`, and an untaken offer returns `not_found`
+- **Quit after the lives run out:** returns the `lives_out` summary, not an error
 - **Errors:**
   - the summary while the run is active gets `forbidden`
   - a second `chooseSide` gets `forbidden`
@@ -87,14 +89,12 @@ Cases:
 - **Every success body parses with its contract schema.**
 - **No response contains the name of a starter that hasn't been revealed yet.** This is checked against the test's own copy of the XI.
 
-## Open Questions
+## Decisions
 
-1. **A player starts a new run while one is already open.**
-   - **End the old one (recommended):** if it is still being played, it ends as `quit` with its lives kept, and if no side was chosen, it is dropped. One live run per user keeps memory bounded, and B34 gets one clean result per run.
-   - Allow parallel runs: several clocks per user, each running until it is evicted.
-2. **`quit` on a run that has already ended (by lives, a perfect clear or an earlier quit).**
-   - **Return its summary unchanged (recommended):** the web mock does this. A player who taps Quit just as the third life goes sees the real end reason, `lives_out`, and doesn't get an error.
-   - Refuse with `session_over`: the engine's own rejection, but `api-contract.md` doesn't list it for `quit`, so the web would show a generic error.
+Settled at `/feature load`:
+
+- **One open run per user.** Starting a new run ends the old one. If that run is being played, it is caught up to now first; if still unfinished, it then ends as `quit` with its lives kept. An offer with no side chosen is dropped. This keeps memory bounded, and B34 gets one clean result per run. Rejected: parallel runs, each with its own clock.
+- **`quit` on a run that has already ended returns its summary unchanged.** This applies after lives run out, a perfect clear or an earlier quit, and matches the web mock. A player who taps Quit as the third life goes sees the real end reason (`lives_out`), not an error. Rejected: `session_over`, which `api-contract.md` doesn't list for `quit`.
 
 ## Out of Scope
 
@@ -122,5 +122,21 @@ Cases:
   - `npm test`, `npm run test:e2e` (dev branch, with `MATCH_POOL_INCLUDE_UNSCORED=true`), `npm run build` and `npm run lint`
   - by hand: run `npm run start:dev`, then play a run with an HTTP client: guest, then match, side, guesses, sync after 16 s, then quit or the summary
   - `/docs` lists the six routes
+
+**Deviations recorded during implementation**
+
+- `src/common/clock.ts` exports `CLOCK`, `Clock` and a `SYSTEM_CLOCK` provider. `SoloModule` provides it; B38 can provide it too, or move it to a shared module.
+- `SoloService` reads the `MatchIdentity` itself, through `PrismaService` and `MATCH_IDENTITY_SELECT`, because the selector returns only a match id.
+- `start` selects the match before it ends the open run. An `empty_pool` refusal therefore leaves the player's open run untouched.
+- `chooseSide` checks the offer again after the squad loads, so the loser of two concurrent picks gets `forbidden`.
+- The eviction timer runs every 5 minutes.
+- The `empty_pool` message is "No match fits those filters. Try widening them.". Engine rejections that can't happen in solo (`not_your_turn`, `wrong_mode`, `unknown_seat`) map to `forbidden`.
+- The service unit tests use the real in-memory `SoloSessionStore`, which has no I/O, with a stubbed selector, loader and Prisma.
+- Database test extras:
+  - the `unauthorized` case
+  - an empty guess and an unknown side
+  - the hidden-player check covers every body, summaries included, because every guest is free
+- A Neon query showed that no seeded player's name appears inside a club, competition, stage, nickname or teammate name, so that check can't fail by chance.
+- Added in testing: `rejectionError` is exported, so the B30 rejection table is tested whole (B38 maps the same rejections). `solo.module.spec.ts` tests the eviction timer: every 5 minutes by `CLOCK`, unref'd, and stopped on destroy.
 
 ## History

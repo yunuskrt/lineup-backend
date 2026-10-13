@@ -41,3 +41,4 @@ Not Started
 - B31 Server Timer Model: 15s+400ms deadlines, catch-up clock, late guess off
 - B32 Team Side Selection: neutral 50/50 until signals.sides, 30-70% tilt
 - B33a Solo Session Core: squad loader, in-memory runs, views, run figures
+- B33b Solo Endpoints: 6 /solo/sessions routes, CLOCK, one open run a user

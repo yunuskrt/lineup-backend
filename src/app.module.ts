@@ -12,6 +12,7 @@ import { OriginCheckMiddleware } from '@/common/origin-check.middleware.js';
 import { ConfigModule } from '@/config/config.module.js';
 import { MatchesModule } from '@/matches/matches.module.js';
 import { PrismaModule } from '@/prisma/prisma.module.js';
+import { SoloModule } from '@/solo/solo.module.js';
 import { UsersModule } from '@/users/users.module.js';
 
 @Module({
@@ -22,6 +23,7 @@ import { UsersModule } from '@/users/users.module.js';
     UsersModule,
     MatchesModule,
     CatalogModule,
+    SoloModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: EnvelopeExceptionFilter },

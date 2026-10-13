@@ -1,5 +1,13 @@
-import { clubRefSchema, matchIdentitySchema } from '@/contract/match.js';
-import { toClubRef, toMatchIdentity } from '@/matches/match-refs.js';
+import {
+  clubRefSchema,
+  matchIdentitySchema,
+  matchInPlaySchema,
+} from '@/contract/match.js';
+import {
+  toClubRef,
+  toMatchIdentity,
+  toMatchInPlay,
+} from '@/matches/match-refs.js';
 
 const CLUB = {
   id: '01900000-0000-7000-8000-000000000001',
@@ -85,5 +93,12 @@ describe('toMatchIdentity', () => {
     expect(() =>
       toMatchIdentity({ ...MATCH, teams: MATCH.teams.slice(0, 1) }),
     ).toThrow(/lacks a side/);
+  });
+
+  it('adds the side and formation for play', () => {
+    const inPlay = toMatchInPlay(toMatchIdentity(MATCH), 'away', '4-2-3-1');
+
+    expect(inPlay).toMatchObject({ side: 'away', formation: '4-2-3-1' });
+    expect(matchInPlaySchema.parse(inPlay)).toEqual(inPlay);
   });
 });

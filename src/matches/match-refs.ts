@@ -1,8 +1,10 @@
 import type { Club, Prisma } from '@/generated/prisma/client.js';
+import type { Side } from '@/contract/common.js';
 import type {
   ClubRef,
   CompetitionRef,
   MatchIdentity,
+  MatchInPlay,
 } from '@/contract/match.js';
 
 type ClubRow = Pick<Club, 'id' | 'name' | 'shortName'>;
@@ -67,4 +69,13 @@ export function toMatchIdentity(match: MatchRow): MatchIdentity {
     score: { home: home.goals, away: away.goals },
     nickname: match.nickname,
   };
+}
+
+// Formation comes from the squad, never a lineup
+export function toMatchInPlay(
+  identity: MatchIdentity,
+  side: Side,
+  formation: string,
+): MatchInPlay {
+  return { ...identity, side, formation };
 }

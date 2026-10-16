@@ -23,11 +23,13 @@ export type TimedInput =
   | { kind: 'forfeit'; seat: Seat }
   | { kind: 'tick' };
 
+type GuessResolved = Extract<GameEffect, { kind: 'guess_resolved' }>;
 type RoundStarted = Extract<GameEffect, { kind: 'round_started' }>;
 type RoundEnded = Extract<GameEffect, { kind: 'round_ended' }>;
 
 export type TimedEffect =
-  | Exclude<GameEffect, RoundStarted | RoundEnded>
+  | Exclude<GameEffect, GuessResolved | RoundStarted | RoundEnded>
+  | (GuessResolved & { receivedAt: number })
   | (RoundStarted & RoundTiming)
   | (RoundEnded & { endedAt: number });
 
@@ -50,6 +52,7 @@ export function nextDeadline(timed: TimedGame): number | null {
 }
 
 function stamp(effect: GameEffect, at: number): TimedEffect {
+  if (effect.kind === 'guess_resolved') return { ...effect, receivedAt: at };
   if (effect.kind === 'round_ended') return { ...effect, endedAt: at };
   if (effect.kind === 'round_started') return { ...effect, ...startRound(at) };
   return effect;

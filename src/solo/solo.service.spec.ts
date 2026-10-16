@@ -6,6 +6,8 @@ import type { MatchSelectorService } from '@/matches/match-selector.service.js';
 import type { SquadLoaderService } from '@/matches/squad-loader.service.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
 import { NAMES, SQUAD, T0 } from '@/solo/solo.fixtures.js';
+import { type PlayedRun, RUN_IDLE_MS } from '@/solo/solo-run.js';
+import type { SoloPersistenceService } from '@/solo/solo-persistence.service.js';
 import {
   rejectionError,
   SOLO_MESSAGES,
@@ -49,14 +51,16 @@ function setup() {
   const load = vi.fn().mockResolvedValue(SQUAD);
   const findUniqueOrThrow = vi.fn().mockResolvedValue(MATCH_ROW);
   const store = new SoloSessionStore();
+  const save = vi.fn().mockResolvedValue(true);
   const service = new SoloService(
     { match: { findUniqueOrThrow } } as unknown as PrismaService,
     { select } as unknown as MatchSelectorService,
     { load } as unknown as SquadLoaderService,
     store,
+    { save } as unknown as SoloPersistenceService,
     clock,
   );
-  return { service, clock, select, load, store };
+  return { service, clock, select, load, store, save };
 }
 
 // A started run with its side chosen at T0
@@ -113,7 +117,9 @@ describe('SoloService', () => {
       ctx.select.mockResolvedValue({ emptyBecause: 'era' });
 
       await failureOf(() => ctx.service.start(ctx.who, FILTERS));
-      expect(ctx.service.sync(ctx.who, ctx.sessionId).status).toBe('active');
+      expect((await ctx.service.sync(ctx.who, ctx.sessionId)).status).toBe(
+        'active',
+      );
     });
 
     it('ends a run in play as quit, lives kept', async () => {
@@ -121,7 +127,7 @@ describe('SoloService', () => {
       ctx.clock.at = T0 + 16_000;
       await ctx.service.start(ctx.who, FILTERS);
 
-      expect(ctx.service.summary(ctx.who, ctx.sessionId)).toMatchObject({
+      expect(await ctx.service.summary(ctx.who, ctx.sessionId)).toMatchObject({
         endReason: 'quit',
         livesRemaining: 2,
       });
@@ -132,7 +138,7 @@ describe('SoloService', () => {
       ctx.clock.at = T0 + 60_000;
       await ctx.service.start(ctx.who, FILTERS);
 
-      expect(ctx.service.summary(ctx.who, ctx.sessionId)).toMatchObject({
+      expect(await ctx.service.summary(ctx.who, ctx.sessionId)).toMatchObject({
         endReason: 'lives_out',
         livesRemaining: 0,
       });
@@ -152,7 +158,9 @@ describe('SoloService', () => {
     it("leaves another user's run alone", async () => {
       const ctx = await playing();
       await ctx.service.start(user('user-2'), FILTERS);
-      expect(ctx.service.sync(ctx.who, ctx.sessionId).status).toBe('active');
+      expect((await ctx.service.sync(ctx.who, ctx.sessionId)).status).toBe(
+        'active',
+      );
     });
   });
 
@@ -234,7 +242,7 @@ describe('SoloService', () => {
     it('reveals a new name and starts the next round now', async () => {
       const ctx = await playing();
       ctx.clock.at = T0 + 4_000;
-      const response = ctx.service.guess(
+      const response = await ctx.service.guess(
         ctx.who,
         ctx.sessionId,
         guessOf(ctx.sessionId, 'charlie'),
@@ -253,7 +261,7 @@ describe('SoloService', () => {
     it('leaves the round running on a miss', async () => {
       const ctx = await playing();
       ctx.clock.at = T0 + 4_000;
-      const response = ctx.service.guess(
+      const response = await ctx.service.guess(
         ctx.who,
         ctx.sessionId,
         guessOf(ctx.sessionId, 'zulu'),
@@ -305,7 +313,7 @@ describe('SoloService', () => {
         message: SOLO_MESSAGES.roundOver,
       });
       expect(JSON.stringify(error)).not.toContain('secret-guess-text');
-      expect(ctx.service.sync(ctx.who, ctx.sessionId)).toMatchObject({
+      expect(await ctx.service.sync(ctx.who, ctx.sessionId)).toMatchObject({
         lives: 2,
         round: { startedAt: T0 + 15_400 },
       });
@@ -313,7 +321,7 @@ describe('SoloService', () => {
 
     it('refuses a guess once the run is over', async () => {
       const ctx = await playing();
-      ctx.service.quit(ctx.who, ctx.sessionId);
+      await ctx.service.quit(ctx.who, ctx.sessionId);
       const error = await failureOf(() =>
         ctx.service.guess(
           ctx.who,
@@ -332,7 +340,7 @@ describe('SoloService', () => {
     it('applies the clock before answering', async () => {
       const ctx = await playing();
       ctx.clock.at = T0 + 31_000;
-      expect(ctx.service.sync(ctx.who, ctx.sessionId)).toMatchObject({
+      expect(await ctx.service.sync(ctx.who, ctx.sessionId)).toMatchObject({
         status: 'active',
         lives: 1,
         round: { startedAt: T0 + 30_800 },
@@ -342,7 +350,7 @@ describe('SoloService', () => {
     it('shows a run lost to the clock as over', async () => {
       const ctx = await playing();
       ctx.clock.at = T0 + 60_000;
-      expect(ctx.service.sync(ctx.who, ctx.sessionId)).toMatchObject({
+      expect(await ctx.service.sync(ctx.who, ctx.sessionId)).toMatchObject({
         status: 'over',
         lives: 0,
         round: null,
@@ -361,7 +369,7 @@ describe('SoloService', () => {
     it('ends the run with the lives kept', async () => {
       const ctx = await playing();
       ctx.clock.at = T0 + 2_000;
-      expect(ctx.service.quit(ctx.who, ctx.sessionId)).toMatchObject({
+      expect(await ctx.service.quit(ctx.who, ctx.sessionId)).toMatchObject({
         endReason: 'quit',
         livesRemaining: 3,
         missedCount: 11,
@@ -373,7 +381,7 @@ describe('SoloService', () => {
     it('returns the real reason for a run already lost', async () => {
       const ctx = await playing();
       ctx.clock.at = T0 + 60_000;
-      expect(ctx.service.quit(ctx.who, ctx.sessionId)).toMatchObject({
+      expect(await ctx.service.quit(ctx.who, ctx.sessionId)).toMatchObject({
         endReason: 'lives_out',
         livesRemaining: 0,
       });
@@ -381,9 +389,9 @@ describe('SoloService', () => {
 
     it('returns the same summary when quit twice', async () => {
       const ctx = await playing();
-      const first = ctx.service.quit(ctx.who, ctx.sessionId);
+      const first = await ctx.service.quit(ctx.who, ctx.sessionId);
       ctx.clock.at = T0 + 9_000;
-      expect(ctx.service.quit(ctx.who, ctx.sessionId)).toEqual(first);
+      expect(await ctx.service.quit(ctx.who, ctx.sessionId)).toEqual(first);
     });
   });
 
@@ -402,9 +410,13 @@ describe('SoloService', () => {
     it('reports a perfect clear', async () => {
       const ctx = await playing();
       for (const name of NAMES) {
-        ctx.service.guess(ctx.who, ctx.sessionId, guessOf(ctx.sessionId, name));
+        await ctx.service.guess(
+          ctx.who,
+          ctx.sessionId,
+          guessOf(ctx.sessionId, name),
+        );
       }
-      expect(ctx.service.summary(ctx.who, ctx.sessionId)).toMatchObject({
+      expect(await ctx.service.summary(ctx.who, ctx.sessionId)).toMatchObject({
         endReason: 'perfect_clear',
         livesRemaining: 3,
         accuracy: 1,
@@ -414,10 +426,14 @@ describe('SoloService', () => {
 
     it('gives the missed list to a pro from the session tier', async () => {
       const ctx = await playing(setup(), user('user-1', 'pro'));
-      ctx.service.guess(ctx.who, ctx.sessionId, guessOf(ctx.sessionId, 'alfa'));
-      ctx.service.quit(ctx.who, ctx.sessionId);
+      await ctx.service.guess(
+        ctx.who,
+        ctx.sessionId,
+        guessOf(ctx.sessionId, 'alfa'),
+      );
+      await ctx.service.quit(ctx.who, ctx.sessionId);
 
-      const summary = ctx.service.summary(ctx.who, ctx.sessionId);
+      const summary = await ctx.service.summary(ctx.who, ctx.sessionId);
       expect(summary.missed).toEqual(SQUAD.players.slice(1));
     });
   });
@@ -431,6 +447,157 @@ describe('SoloService', () => {
       ['unknown_seat', 'forbidden', SOLO_MESSAGES.notAllowed],
     ] as const)('maps %s to %s', (rejected, code, message) => {
       expect(rejectionError(rejected).error).toMatchObject({ code, message });
+    });
+  });
+
+  describe('saving', () => {
+    const savedRunOf = (ctx: ReturnType<typeof setup>, at = 0) =>
+      ctx.save.mock.calls[at][0] as PlayedRun;
+
+    it('saves nothing while the run is in play', async () => {
+      const ctx = await playing();
+      ctx.clock.at = T0 + 16_000;
+      await ctx.service.sync(ctx.who, ctx.sessionId);
+      expect(ctx.save).not.toHaveBeenCalled();
+    });
+
+    it('saves the run in the call that ends it, once', async () => {
+      const ctx = await playing();
+      await ctx.service.quit(ctx.who, ctx.sessionId);
+      await ctx.service.quit(ctx.who, ctx.sessionId);
+      await ctx.service.summary(ctx.who, ctx.sessionId);
+
+      expect(ctx.save).toHaveBeenCalledTimes(1);
+      expect(savedRunOf(ctx).timed.game.result).toMatchObject({
+        endReason: 'quit',
+      });
+      expect(ctx.store.get(ctx.sessionId, 'user-1')).toMatchObject({
+        savedAt: T0,
+      });
+    });
+
+    it('saves a perfect clear on the eleventh name', async () => {
+      const ctx = await playing();
+      for (const name of NAMES) {
+        await ctx.service.guess(
+          ctx.who,
+          ctx.sessionId,
+          guessOf(ctx.sessionId, name),
+        );
+      }
+      expect(ctx.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('still answers when the save fails, and stays unsaved', async () => {
+      const ctx = await playing();
+      ctx.save.mockResolvedValue(false);
+
+      const summary = await ctx.service.quit(ctx.who, ctx.sessionId);
+      expect(summary.endReason).toBe('quit');
+      expect(ctx.store.get(ctx.sessionId, 'user-1')).toMatchObject({
+        savedAt: null,
+      });
+    });
+
+    it('saves the open run a new start ends', async () => {
+      const ctx = await playing();
+      await ctx.service.start(ctx.who, FILTERS);
+      expect(savedRunOf(ctx).id).toBe(ctx.sessionId);
+    });
+  });
+
+  describe('sweep', () => {
+    it('ends and saves a run its player abandoned', async () => {
+      const ctx = await playing();
+      ctx.clock.at = T0 + 60_000;
+      await ctx.service.sweep();
+
+      const saved = ctx.save.mock.calls[0][0] as PlayedRun;
+      expect(saved.timed.game.result).toMatchObject({
+        endReason: 'lives_out',
+      });
+      // The clock moving is not a touch
+      expect(ctx.store.get(ctx.sessionId, 'user-1')).toMatchObject({
+        touchedAt: T0,
+        savedAt: T0 + 60_000,
+      });
+    });
+
+    it('leaves a run in play alone', async () => {
+      const ctx = await playing();
+      ctx.clock.at = T0 + 5_000;
+      await ctx.service.sweep();
+      expect(ctx.save).not.toHaveBeenCalled();
+      expect((await ctx.service.sync(ctx.who, ctx.sessionId)).status).toBe(
+        'active',
+      );
+    });
+
+    it('retries a save that failed', async () => {
+      const ctx = await playing();
+      ctx.save.mockResolvedValueOnce(false);
+      await ctx.service.quit(ctx.who, ctx.sessionId);
+
+      ctx.clock.at = T0 + 60_000;
+      await ctx.service.sweep();
+      expect(ctx.save).toHaveBeenCalledTimes(2);
+      expect(ctx.store.get(ctx.sessionId, 'user-1')).toMatchObject({
+        savedAt: T0 + 60_000,
+      });
+    });
+
+    it('evicts idle runs once saved, but never an unsaved one', async () => {
+      const ctx = await playing();
+      ctx.save.mockResolvedValue(false);
+      await ctx.service.quit(ctx.who, ctx.sessionId);
+
+      ctx.clock.at = T0 + RUN_IDLE_MS;
+      await ctx.service.sweep();
+      expect(ctx.store.get(ctx.sessionId, 'user-1')).toBeDefined();
+
+      ctx.save.mockResolvedValue(true);
+      await ctx.service.sweep();
+      expect(ctx.store.get(ctx.sessionId, 'user-1')).toBeUndefined();
+    });
+
+    it('keeps a guess made while it waits on another save', async () => {
+      const ctx = setup();
+      const first = await playing(ctx, user('user-a'));
+      ctx.save.mockResolvedValueOnce(false);
+      await ctx.service.quit(first.who, first.sessionId);
+
+      const second = await playing(ctx, user('user-b'));
+      let finish: (saved: boolean) => void = () => {};
+      ctx.save.mockReturnValueOnce(
+        new Promise<boolean>((resolve) => (finish = resolve)),
+      );
+
+      const sweeping = ctx.service.sweep();
+      await ctx.service.guess(
+        second.who,
+        second.sessionId,
+        guessOf(second.sessionId, 'alfa'),
+      );
+      finish(true);
+      await sweeping;
+
+      const session = await ctx.service.sync(second.who, second.sessionId);
+      expect(session.found.map((player) => player.id)).toEqual(['p-alfa']);
+    });
+
+    it('skips a sweep while one is still saving', async () => {
+      const ctx = await playing();
+      ctx.clock.at = T0 + 60_000;
+      let finish: (saved: boolean) => void = () => {};
+      ctx.save.mockReturnValue(
+        new Promise<boolean>((resolve) => (finish = resolve)),
+      );
+
+      const first = ctx.service.sweep();
+      await ctx.service.sweep();
+      finish(true);
+      await first;
+      expect(ctx.save).toHaveBeenCalledTimes(1);
     });
   });
 });

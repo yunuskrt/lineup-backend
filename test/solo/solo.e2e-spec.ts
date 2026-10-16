@@ -134,6 +134,10 @@ describe('Solo (e2e)', () => {
   });
 
   afterAll(async () => {
+    // Saved runs restrict a user delete (B10a)
+    await prisma.gameSession.deleteMany({
+      where: { participants: { some: { userId: { in: guests } } } },
+    });
     await prisma.user.deleteMany({ where: { id: { in: guests } } });
     await app.close();
   });

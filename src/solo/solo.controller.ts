@@ -64,7 +64,7 @@ export class SoloController {
     @Param('sessionId', SESSION_ID) sessionId: string,
     @Body(new ZodValidationPipe(soloGuessRequestSchema))
     body: SoloGuessRequest,
-  ): SoloGuessResponse {
+  ): Promise<SoloGuessResponse> {
     return this.solo.guess(user, sessionId, body);
   }
 
@@ -74,7 +74,7 @@ export class SoloController {
   sync(
     @CurrentUser() user: User,
     @Param('sessionId', SESSION_ID) sessionId: string,
-  ): SoloSession {
+  ): Promise<SoloSession> {
     return this.solo.sync(user, sessionId);
   }
 
@@ -84,7 +84,7 @@ export class SoloController {
   quit(
     @CurrentUser() user: User,
     @Param('sessionId', SESSION_ID) sessionId: string,
-  ): SoloSummary {
+  ): Promise<SoloSummary> {
     return this.solo.quit(user, sessionId);
   }
 
@@ -94,7 +94,7 @@ export class SoloController {
   summary(
     @CurrentUser() user: User,
     @Param('sessionId', SESSION_ID) sessionId: string,
-  ): SoloSummary {
+  ): Promise<SoloSummary> {
     return this.solo.summary(user, sessionId);
   }
 }

@@ -70,4 +70,32 @@ describe('SoloSessionStore', () => {
     expect(store.get('old', 'user-1')).toBeUndefined();
     expect(store.get('fresh', 'user-1')).toBeDefined();
   });
+
+  it('marks the latest copy saved, and skips a run gone or unplayed', () => {
+    const store = new SoloSessionStore();
+    store.save(offeredRun({ id: 'offer' }));
+    store.save({ ...playedRun(), id: 'played' });
+
+    store.markSaved('played', T0 + 5);
+    store.markSaved('offer', T0 + 5);
+    store.markSaved('gone', T0 + 5);
+
+    expect(store.get('played', 'user-1')).toMatchObject({ savedAt: T0 + 5 });
+    expect(store.get('offer', 'user-1')).not.toHaveProperty('savedAt');
+    expect(store.get('gone', 'user-1')).toBeUndefined();
+  });
+
+  it('lists only runs with a side for the sweep', () => {
+    const store = new SoloSessionStore();
+    store.save(offeredRun({ id: 'offer' }));
+    store.save({ ...playedRun(), id: 'played' });
+    expect(store.played().map((run) => run.id)).toEqual(['played']);
+  });
+
+  it('keeps an idle run that is over but unsaved', () => {
+    const store = new SoloSessionStore();
+    store.save({ ...playedRun([QUIT, 100]), touchedAt: T0 });
+    expect(store.evictIdle(T0 + RUN_IDLE_MS)).toBe(0);
+    expect(store.get('run-1', 'user-1')).toBeDefined();
+  });
 });

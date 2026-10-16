@@ -1,35 +1,41 @@
 import {
-  Inject,
+  Logger,
   Module,
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
-import { CLOCK, type Clock, SYSTEM_CLOCK } from '@/common/clock.js';
+import { SYSTEM_CLOCK } from '@/common/clock.js';
 import { MatchesModule } from '@/matches/matches.module.js';
+import { SoloPersistenceService } from '@/solo/solo-persistence.service.js';
 import { SoloController } from '@/solo/solo.controller.js';
 import { SoloService } from '@/solo/solo.service.js';
 import { SoloSessionStore } from '@/solo/solo-session.store.js';
 
-const EVICT_EVERY_MS = 5 * 60_000;
+export const SWEEP_EVERY_MS = 60_000;
 
 @Module({
   imports: [MatchesModule],
   controllers: [SoloController],
-  providers: [SoloService, SoloSessionStore, SYSTEM_CLOCK],
+  providers: [
+    SoloService,
+    SoloSessionStore,
+    SoloPersistenceService,
+    SYSTEM_CLOCK,
+  ],
 })
 export class SoloModule implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger('SoloSweep');
   private timer: NodeJS.Timeout | undefined;
 
-  constructor(
-    private readonly store: SoloSessionStore,
-    @Inject(CLOCK) private readonly clock: Clock,
-  ) {}
+  constructor(private readonly solo: SoloService) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(
-      () => this.store.evictIdle(this.clock.now()),
-      EVICT_EVERY_MS,
-    );
+    this.timer = setInterval(() => {
+      this.solo.sweep().catch((error: unknown) => {
+        const kind = error instanceof Error ? error.name : 'unknown';
+        this.logger.error(`Sweep failed (${kind})`);
+      });
+    }, SWEEP_EVERY_MS);
     // Never keeps the process alive on its own
     this.timer.unref();
   }

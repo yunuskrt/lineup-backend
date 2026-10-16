@@ -88,6 +88,7 @@ describe('a guess', () => {
       {
         kind: 'guess_resolved',
         seat: 0,
+        text: 'Delta',
         verdict: { kind: 'correct_new', playerId: 'p-delta' },
       },
       { kind: 'player_revealed', seat: 0, playerId: 'p-delta' },
@@ -121,6 +122,7 @@ describe('a guess', () => {
       {
         kind: 'guess_resolved',
         seat: 1,
+        text: 'delta',
         verdict: { kind: 'already_found', playerId: 'p-delta' },
       },
     ]);
@@ -134,6 +136,7 @@ describe('a guess', () => {
       {
         kind: 'guess_resolved',
         seat: 0,
+        text: 'Delta',
         verdict: { kind: 'already_found', playerId: 'p-delta' },
       },
     ]);
@@ -147,7 +150,12 @@ describe('a guess', () => {
     const step = ok(applyInput(state, guess(seat, 'Zinedine Zidane')));
     expect(step.state).toBe(state);
     expect(step.effects).toEqual([
-      { kind: 'guess_resolved', seat, verdict: { kind: 'not_in_xi' } },
+      {
+        kind: 'guess_resolved',
+        seat,
+        text: 'Zinedine Zidane',
+        verdict: { kind: 'not_in_xi' },
+      },
     ]);
   });
 });

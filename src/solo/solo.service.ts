@@ -26,7 +26,13 @@ import {
 import { MatchSelectorService } from '@/matches/match-selector.service.js';
 import { SquadLoaderService } from '@/matches/squad-loader.service.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
-import { isOver, type OfferedRun, type PlayedRun } from '@/solo/solo-run.js';
+import { SoloPersistenceService } from '@/solo/solo-persistence.service.js';
+import {
+  isOver,
+  isUnsaved,
+  type OfferedRun,
+  type PlayedRun,
+} from '@/solo/solo-run.js';
 import { SoloSessionStore } from '@/solo/solo-session.store.js';
 import {
   toGuessResult,
@@ -60,11 +66,14 @@ export function rejectionError(rejected: TimedRejection): ApiException {
 
 @Injectable()
 export class SoloService {
+  private isSweeping = false;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly selector: MatchSelectorService,
     private readonly squads: SquadLoaderService,
     private readonly store: SoloSessionStore,
+    private readonly persistence: SoloPersistenceService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -78,7 +87,7 @@ export class SoloService {
     const match = await this.identityOf(selection.matchId);
 
     const now = this.clock.now();
-    this.endOpenRun(user.id, now);
+    await this.endOpenRun(user.id, now);
     const run: OfferedRun = {
       id: randomUUID(),
       userId: user.id,
@@ -116,21 +125,22 @@ export class SoloService {
       timed,
       firstRound,
       effects: [],
+      savedAt: null,
     };
     this.store.save(run);
     return toSoloSession(run);
   }
 
-  guess(
+  async guess(
     user: User,
     sessionId: string,
     request: SoloGuessRequest,
-  ): SoloGuessResponse {
+  ): Promise<SoloGuessResponse> {
     if (request.sessionId !== sessionId) {
       throw new ApiException('invalid_input', SOLO_MESSAGES.otherRun);
     }
     const input: TimedInput = { kind: 'guess', seat: 0, text: request.guess };
-    const { run, step } = this.apply(user, sessionId, input);
+    const { run, step } = await this.apply(user, sessionId, input);
     if (step.rejected) throw rejectionError(step.rejected);
 
     const resolved = step.effects.find(
@@ -143,12 +153,13 @@ export class SoloService {
     };
   }
 
-  sync(user: User, sessionId: string): SoloSession {
-    return toSoloSession(this.apply(user, sessionId, { kind: 'tick' }).run);
+  async sync(user: User, sessionId: string): Promise<SoloSession> {
+    const { run } = await this.apply(user, sessionId, { kind: 'tick' });
+    return toSoloSession(run);
   }
 
-  quit(user: User, sessionId: string): SoloSummary {
-    const { run, step } = this.apply(user, sessionId, { kind: 'quit' });
+  async quit(user: User, sessionId: string): Promise<SoloSummary> {
+    const { run, step } = await this.apply(user, sessionId, { kind: 'quit' });
     // An ended run keeps its own end reason
     if (step.rejected && step.rejected !== 'session_over') {
       throw rejectionError(step.rejected);
@@ -156,12 +167,32 @@ export class SoloService {
     return toSoloSummary(run, user.tier);
   }
 
-  summary(user: User, sessionId: string): SoloSummary {
-    const { run } = this.apply(user, sessionId, { kind: 'tick' });
+  async summary(user: User, sessionId: string): Promise<SoloSummary> {
+    const { run } = await this.apply(user, sessionId, { kind: 'tick' });
     if (!isOver(run)) {
       throw new ApiException('forbidden', SOLO_MESSAGES.stillPlaying);
     }
     return toSoloSummary(run, user.tier);
+  }
+
+  // Ends abandoned runs, saves them, frees memory
+  async sweep(): Promise<void> {
+    if (this.isSweeping) return;
+    this.isSweeping = true;
+    try {
+      const now = this.clock.now();
+      for (const { id, userId } of this.store.played()) {
+        // Re-read: a request may have moved it on
+        const run = this.store.get(id, userId);
+        if (!run?.side) continue;
+        const tick = applyTimed(run.timed, { kind: 'tick' }, now);
+        // The clock moving is not the player's touch
+        await this.settle(this.record(run, tick, run.touchedAt), now);
+      }
+      this.store.evictIdle(now);
+    } finally {
+      this.isSweeping = false;
+    }
   }
 
   private async identityOf(matchId: string): Promise<MatchIdentity> {
@@ -173,14 +204,21 @@ export class SoloService {
   }
 
   // One open run per user: the old one ends
-  private endOpenRun(userId: string, now: number): void {
+  private async endOpenRun(userId: string, now: number): Promise<void> {
     const open = this.store.activeOf(userId);
     if (!open) return;
     if (open.side === null) {
       this.store.drop(open.id);
       return;
     }
-    this.record(open, applyTimed(open.timed, { kind: 'quit' }, now), now);
+    const step = applyTimed(open.timed, { kind: 'quit' }, now);
+    await this.settle(this.record(open, step, now), now);
+  }
+
+  // A failed save stays unsaved for the sweep
+  private async settle(run: PlayedRun, now: number): Promise<void> {
+    if (!isUnsaved(run)) return;
+    if (await this.persistence.save(run)) this.store.markSaved(run.id, now);
   }
 
   private offerOf(sessionId: string, user: User): OfferedRun {
@@ -202,19 +240,25 @@ export class SoloService {
   }
 
   // Catch-up is kept even when the input is refused
-  private apply(user: User, sessionId: string, input: TimedInput) {
+  private async apply(user: User, sessionId: string, input: TimedInput) {
     const now = this.clock.now();
     const played = this.playedOf(sessionId, user);
     const step = applyTimed(played.timed, input, now);
-    return { run: this.record(played, step, now), step };
+    const run = this.record(played, step, now);
+    await this.settle(run, now);
+    return { run, step };
   }
 
-  private record(run: PlayedRun, step: TimedStep, now: number): PlayedRun {
+  private record(
+    run: PlayedRun,
+    step: TimedStep,
+    touchedAt: number,
+  ): PlayedRun {
     const next: PlayedRun = {
       ...run,
       timed: step.timed,
       effects: [...run.effects, ...step.effects],
-      touchedAt: now,
+      touchedAt,
     };
     this.store.save(next);
     return next;

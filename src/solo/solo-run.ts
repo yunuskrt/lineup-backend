@@ -27,6 +27,8 @@ export type PlayedRun = RunBase & {
   readonly timed: TimedGame;
   readonly firstRound: RoundTiming;
   readonly effects: readonly TimedEffect[];
+  // Set once the finished run is in Postgres
+  readonly savedAt: number | null;
 };
 
 export type SoloRun = OfferedRun | PlayedRun;
@@ -35,4 +37,9 @@ export const RUN_IDLE_MS = 30 * 60_000;
 
 export function isOver(run: SoloRun): boolean {
   return run.timed !== null && run.timed.game.result !== null;
+}
+
+// Over but not yet in Postgres: never evicted
+export function isUnsaved(run: SoloRun): run is PlayedRun {
+  return run.side !== null && isOver(run) && run.savedAt === null;
 }

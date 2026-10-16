@@ -82,6 +82,7 @@ export function playedRun(...inputs: [TimedInput, number][]): PlayedRun {
     timed: start,
     firstRound: start.round!,
     effects: [],
+    savedAt: null,
   };
   for (const [input, offset] of inputs) {
     const step = applyTimed(run.timed, input, T0 + offset);

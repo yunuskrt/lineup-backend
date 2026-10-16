@@ -1,43 +1,48 @@
-import type { Clock } from '@/common/clock.js';
-import { SoloModule } from '@/solo/solo.module.js';
-import type { SoloSessionStore } from '@/solo/solo-session.store.js';
-
-const FIVE_MINUTES = 5 * 60_000;
+import { SoloModule, SWEEP_EVERY_MS } from '@/solo/solo.module.js';
+import type { SoloService } from '@/solo/solo.service.js';
 
 describe('SoloModule', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  function moduleWith() {
-    const evictIdle = vi.fn();
-    const clock: Clock & { at: number } = { at: 42, now: () => clock.at };
-    const store = { evictIdle } as unknown as SoloSessionStore;
-    return { module: new SoloModule(store, clock), evictIdle, clock };
+  function moduleWith(sweep = vi.fn().mockResolvedValue(undefined)) {
+    const solo = { sweep } as unknown as SoloService;
+    return { module: new SoloModule(solo), sweep };
   }
 
-  it('evicts idle runs every five minutes, by the clock', () => {
-    const { module, evictIdle, clock } = moduleWith();
+  it('sweeps every minute', async () => {
+    const { module, sweep } = moduleWith();
     module.onModuleInit();
 
-    vi.advanceTimersByTime(FIVE_MINUTES - 1);
-    expect(evictIdle).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(SWEEP_EVERY_MS - 1);
+    expect(sweep).not.toHaveBeenCalled();
 
-    clock.at = 1_000;
-    vi.advanceTimersByTime(1);
-    expect(evictIdle).toHaveBeenCalledWith(1_000);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(sweep).toHaveBeenCalledTimes(1);
 
-    vi.advanceTimersByTime(FIVE_MINUTES);
-    expect(evictIdle).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(SWEEP_EVERY_MS);
+    expect(sweep).toHaveBeenCalledTimes(2);
     module.onModuleDestroy();
   });
 
-  it('stops evicting once destroyed', () => {
-    const { module, evictIdle } = moduleWith();
+  it('keeps sweeping after a sweep fails', async () => {
+    const sweep = vi.fn().mockRejectedValueOnce(new Error('down'));
+    sweep.mockResolvedValue(undefined);
+    const { module } = moduleWith(sweep);
+    module.onModuleInit();
+
+    await vi.advanceTimersByTimeAsync(2 * SWEEP_EVERY_MS);
+    expect(sweep).toHaveBeenCalledTimes(2);
+    module.onModuleDestroy();
+  });
+
+  it('stops sweeping once destroyed', async () => {
+    const { module, sweep } = moduleWith();
     module.onModuleInit();
     module.onModuleDestroy();
 
-    vi.advanceTimersByTime(3 * FIVE_MINUTES);
-    expect(evictIdle).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(3 * SWEEP_EVERY_MS);
+    expect(sweep).not.toHaveBeenCalled();
   });
 
   it('never keeps the process alive on its own', () => {

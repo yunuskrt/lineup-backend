@@ -40,7 +40,8 @@ export type GameInput =
   | { kind: 'forfeit'; seat: Seat };
 
 export type GameEffect =
-  | { kind: 'guess_resolved'; seat: Seat; verdict: GuessVerdict }
+  // Holds the guess text: never logged or sent
+  | { kind: 'guess_resolved'; seat: Seat; text: string; verdict: GuessVerdict }
   | { kind: 'player_revealed'; seat: Seat; playerId: string }
   | { kind: 'life_lost'; seat: Seat; lives: number }
   | { kind: 'round_ended'; round: number; seat: Seat; reason: RoundEndReason }
@@ -122,7 +123,7 @@ function applyGuess(state: GameState, seat: Seat, text: string): Step {
 
   const foundIds = state.found.map((entry) => entry.playerId);
   const verdict = classifyGuess(text, state.squad, foundIds);
-  const resolved: GameEffect = { kind: 'guess_resolved', seat, verdict };
+  const resolved: GameEffect = { kind: 'guess_resolved', seat, text, verdict };
   if (verdict.kind !== 'correct_new') return { state, effects: [resolved] };
 
   const next = {

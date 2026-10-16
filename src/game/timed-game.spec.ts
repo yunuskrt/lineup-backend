@@ -87,7 +87,13 @@ describe('a guess in time', () => {
     const step = applyTimed(timed, guess(0, 'Nobody'), T0 + 5_000);
     expect(step.timed).toBe(timed);
     expect(step.effects).toEqual([
-      { kind: 'guess_resolved', seat: 0, verdict: { kind: 'not_in_xi' } },
+      {
+        kind: 'guess_resolved',
+        seat: 0,
+        text: 'Nobody',
+        verdict: { kind: 'not_in_xi' },
+        receivedAt: T0 + 5_000,
+      },
     ]);
   });
 
@@ -297,6 +303,18 @@ describe('a wall clock stepping back', () => {
     const ended = step.effects.find((e) => e.kind === 'round_ended');
     expect(ended).toMatchObject({ round: 2, endedAt: T0 + 5_000 });
     expect(step.timed.round?.startedAt).toBe(T0 + 5_000);
+  });
+
+  it('stamps a guess at the clamped time it was judged', () => {
+    const started = run(solo(), guess(0, 'Alfa'), T0 + 5_000);
+    const step = applyTimed(started, guess(0, 'Nobody'), T0 + 4_000);
+    expect(step.effects).toEqual([
+      expect.objectContaining({
+        kind: 'guess_resolved',
+        text: 'Nobody',
+        receivedAt: T0 + 5_000,
+      }),
+    ]);
   });
 });
 

@@ -11,6 +11,7 @@ import {
 import { Public } from '@/auth/public.decorator.js';
 import { AUTH_TOKEN_DOC } from '@/auth/session-docs.decorator.js';
 import { ContractResponse } from '@/common/contract-response.js';
+import { LimitPerAccount, RateLimit } from '@/common/rate-limits.js';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe.js';
 import {
   sessionOrNullSchema,
@@ -53,6 +54,7 @@ export class AuthController {
   }
 
   @Post('sign-up')
+  @RateLimit('signUp')
   @ApiBody({ schema: { $ref: componentRef('SignUpRequest') } })
   @ContractResponse(sessionSchema, { headers: AUTH_TOKEN_DOC })
   async signUp(
@@ -64,6 +66,8 @@ export class AuthController {
   }
 
   @Post('sign-in')
+  @RateLimit('signIn')
+  @LimitPerAccount()
   @ApiBody({ schema: { $ref: componentRef('SignInRequest') } })
   @ContractResponse(sessionSchema, { headers: AUTH_TOKEN_DOC })
   async signIn(
@@ -75,12 +79,14 @@ export class AuthController {
   }
 
   @Post('guest')
+  @RateLimit('guest')
   @ContractResponse(sessionSchema, { headers: AUTH_TOKEN_DOC })
   async guest(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return sendCookies(res, await this.auth.continueAsGuest(headersOf(req)));
   }
 
   @Post('upgrade')
+  @RateLimit('upgrade')
   @ApiBody({ schema: { $ref: componentRef('UpgradeGuestRequest') } })
   @ContractResponse(sessionSchema, { headers: AUTH_TOKEN_DOC })
   async upgrade(

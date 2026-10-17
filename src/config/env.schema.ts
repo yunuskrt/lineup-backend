@@ -46,6 +46,10 @@ export const envSchema = z
       .optional(),
     // Dev only: unscored mock matches join the pool
     MATCH_POOL_INCLUDE_UNSCORED: z.stringbool().default(false),
+    // Proxies in front (Railway, Fly) for req.ip
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
+    // Off only for e2e suites not about limits
+    RATE_LIMITS_ENABLED: z.stringbool().default(true),
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.RESEND_API_KEY, {
     path: ['RESEND_API_KEY'],
@@ -82,6 +86,11 @@ export const envSchema = z
       message: 'Must be false in production',
       when: () => true,
     },
-  );
+  )
+  .refine((env) => env.NODE_ENV !== 'production' || env.RATE_LIMITS_ENABLED, {
+    path: ['RATE_LIMITS_ENABLED'],
+    message: 'Must be true in production',
+    when: () => true,
+  });
 
 export type Env = z.infer<typeof envSchema>;

@@ -25,6 +25,8 @@ const env: Env = {
   WEB_APP_URL: 'http://localhost:3000',
   MAIL_FROM: 'Lineup <onboarding@resend.dev>',
   MATCH_POOL_INCLUDE_UNSCORED: false,
+  TRUST_PROXY_HOPS: 0,
+  RATE_LIMITS_ENABLED: true,
 };
 
 describe('createAuth', () => {

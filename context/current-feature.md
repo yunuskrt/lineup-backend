@@ -43,3 +43,4 @@ Not Started
 - B33a Solo Session Core: squad loader, in-memory runs, views, run figures
 - B33b Solo Endpoints: 6 /solo/sessions routes, CLOCK, one open run a user
 - B34 Solo Persistence: one-tx save at run end, stats upsert, minute sweep
+- B35 REST Rate Limiting: throttler, user/IP/email keys, 429 with the wait

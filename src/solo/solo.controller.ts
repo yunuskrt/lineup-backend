@@ -3,6 +3,7 @@ import { ApiBody, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@/auth/current-user.decorator.js';
 import { DocumentsSession } from '@/auth/session-docs.decorator.js';
 import { ContractResponse } from '@/common/contract-response.js';
+import { RateLimit } from '@/common/rate-limits.js';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe.js';
 import type { User } from '@/contract/auth.js';
 import { idSchema } from '@/contract/common.js';
@@ -32,6 +33,7 @@ export class SoloController {
   constructor(private readonly solo: SoloService) {}
 
   @Post()
+  @RateLimit('start')
   @ApiBody({ schema: { $ref: componentRef('Filters') } })
   @DocumentsSession()
   @ContractResponse(soloMatchOfferSchema)
@@ -56,6 +58,7 @@ export class SoloController {
   }
 
   @Post(':sessionId/guesses')
+  @RateLimit('guess')
   @ApiBody({ schema: { $ref: componentRef('SoloGuessRequest') } })
   @DocumentsSession()
   @ContractResponse(soloGuessResponseSchema)

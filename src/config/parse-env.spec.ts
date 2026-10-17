@@ -27,6 +27,8 @@ describe('parseEnv', () => {
         NODE_ENV: 'development',
         PORT: 8080,
         MATCH_POOL_INCLUDE_UNSCORED: false,
+        TRUST_PROXY_HOPS: 0,
+        RATE_LIMITS_ENABLED: true,
         ...base,
       },
     });
@@ -37,7 +39,13 @@ describe('parseEnv', () => {
     const result = parseEnv({ ...prod, PORT: '8090' });
     expect(result).toEqual({
       success: true,
-      data: { ...prod, PORT: 8090, MATCH_POOL_INCLUDE_UNSCORED: false },
+      data: {
+        ...prod,
+        PORT: 8090,
+        MATCH_POOL_INCLUDE_UNSCORED: false,
+        TRUST_PROXY_HOPS: 0,
+        RATE_LIMITS_ENABLED: true,
+      },
     });
   });
 
@@ -320,6 +328,36 @@ describe('parseEnv', () => {
         MATCH_POOL_INCLUDE_UNSCORED: 'false',
       });
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('TRUST_PROXY_HOPS', () => {
+    it('coerces a hop count', () => {
+      const result = parseEnv({ ...base, TRUST_PROXY_HOPS: '1' });
+      expect(result.success && result.data.TRUST_PROXY_HOPS).toBe(1);
+    });
+
+    it.each(['-1', '1.5', '11', 'proxy'])('rejects %j', (raw) => {
+      const result = parseEnv({ ...base, TRUST_PROXY_HOPS: raw });
+      expect(!result.success && result.error.map((i) => i.key)).toEqual([
+        'TRUST_PROXY_HOPS',
+      ]);
+    });
+  });
+
+  describe('RATE_LIMITS_ENABLED', () => {
+    const prod = { ...base, ...HTTPS, NODE_ENV: 'production', RESEND_API_KEY };
+
+    it('may be switched off outside production', () => {
+      const result = parseEnv({ ...base, RATE_LIMITS_ENABLED: 'false' });
+      expect(result.success && result.data.RATE_LIMITS_ENABLED).toBe(false);
+    });
+
+    it('is refused as false in production', () => {
+      const result = parseEnv({ ...prod, RATE_LIMITS_ENABLED: 'false' });
+      expect(!result.success && result.error).toEqual([
+        { key: 'RATE_LIMITS_ENABLED', reason: 'Must be true in production' },
+      ]);
     });
   });
 

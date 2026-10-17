@@ -7,6 +7,7 @@ import { createAuth } from '@/auth/auth.factory.js';
 import { GatewayTokenController } from '@/auth/gateway-token.controller.js';
 import { GatewayTokenService } from '@/auth/gateway-token.service.js';
 import { SessionGuard } from '@/auth/session.guard.js';
+import { RateLimitGuard } from '@/common/rate-limit.guard.js';
 import { ENV } from '@/config/config.module.js';
 import type { Env } from '@/config/env.schema.js';
 import { MailModule } from '@/mail/mail.module.js';
@@ -39,6 +40,8 @@ import { PrismaService } from '@/prisma/prisma.service.js';
     AuthFlowService,
     GatewayTokenService,
     { provide: APP_GUARD, useClass: SessionGuard },
+    // Global guards run in order: limits need the user
+    { provide: APP_GUARD, useClass: RateLimitGuard },
   ],
   // B36's handshake verifies tokens with it
   exports: [GatewayTokenService],

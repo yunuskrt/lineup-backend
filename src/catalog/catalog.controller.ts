@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Public } from '@/auth/public.decorator.js';
 import { CatalogService } from '@/catalog/catalog.service.js';
 import { ContractResponse } from '@/common/contract-response.js';
+import { RateLimit } from '@/common/rate-limits.js';
 import { type FilterOptions, filterOptionsSchema } from '@/contract/catalog.js';
 
 @ApiTags('catalog')
@@ -13,6 +14,7 @@ export class CatalogController {
   // Public: /play renders before any session
   @Public()
   @Get('filter-options')
+  @RateLimit('catalog')
   @ContractResponse(filterOptionsSchema)
   filterOptions(): Promise<FilterOptions> {
     return this.catalog.filterOptions();

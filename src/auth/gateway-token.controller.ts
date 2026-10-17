@@ -5,6 +5,7 @@ import type { Request } from 'express';
 import { GatewayTokenService } from '@/auth/gateway-token.service.js';
 import { DocumentsSession } from '@/auth/session-docs.decorator.js';
 import { ContractResponse } from '@/common/contract-response.js';
+import { RateLimit } from '@/common/rate-limits.js';
 import { type GatewayToken, gatewayTokenSchema } from '@/contract/auth.js';
 
 // Guarded, so kept off the @Public() AuthController
@@ -14,6 +15,7 @@ export class GatewayTokenController {
   constructor(private readonly tokens: GatewayTokenService) {}
 
   @Get('token')
+  @RateLimit('token')
   // A credential: no browser or proxy may keep it
   @Header('Cache-Control', 'no-store')
   @DocumentsSession()

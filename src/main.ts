@@ -1,9 +1,11 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from '@/app.module.js';
 import { applyCors } from '@/config/cors.js';
 import { loadEnv } from '@/config/load-env.js';
 import { formatEnvIssues } from '@/config/parse-env.js';
+import { applyTrustProxy } from '@/config/proxy.js';
 import { setupDocs } from '@/docs/setup-docs.js';
 
 async function bootstrap() {
@@ -15,7 +17,11 @@ async function bootstrap() {
   }
 
   // AuthModule parses bodies, skipping /api/auth
-  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
+  // Rate limits key on req.ip (B35)
+  applyTrustProxy(app, env.data);
   // Lets SIGTERM close the database pool cleanly
   app.enableShutdownHooks();
   applyCors(app, env.data);

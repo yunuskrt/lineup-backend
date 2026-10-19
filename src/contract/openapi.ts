@@ -3,6 +3,7 @@ import '@/contract/auth.js';
 import '@/contract/catalog.js';
 import '@/contract/duel.js';
 import '@/contract/profile.js';
+import '@/contract/socket.js';
 import '@/contract/solo.js';
 import { contractRegistry } from '@/contract/registry.js';
 

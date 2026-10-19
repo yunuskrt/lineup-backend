@@ -20,6 +20,11 @@ function sourceOrigin({ origin, referer }: WriteRequest): string | null {
   return URL.canParse(referer) ? new URL(referer).origin : 'null';
 }
 
+// The web app, and Swagger on the API's own origin
+export function trustedOrigins(env: Env): string[] {
+  return [env.WEB_APP_URL, new URL(env.BETTER_AUTH_URL).origin];
+}
+
 // Lax cookies skip cross-site POSTs: check them all
 export function isRefused(request: WriteRequest, trusted: string[]): boolean {
   if (SAFE_METHODS.has(request.method.toUpperCase())) return false;
@@ -32,8 +37,7 @@ export class OriginCheckMiddleware implements NestMiddleware {
   private readonly trusted: string[];
 
   constructor(@Inject(ENV) env: Env) {
-    // The web app, and Swagger on the API's own origin
-    this.trusted = [env.WEB_APP_URL, new URL(env.BETTER_AUTH_URL).origin];
+    this.trusted = trustedOrigins(env);
   }
 
   use(req: Request, _res: Response, next: NextFunction): void {

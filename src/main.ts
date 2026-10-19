@@ -7,6 +7,7 @@ import { loadEnv } from '@/config/load-env.js';
 import { formatEnvIssues } from '@/config/parse-env.js';
 import { applyTrustProxy } from '@/config/proxy.js';
 import { setupDocs } from '@/docs/setup-docs.js';
+import { LineupIoAdapter } from '@/duel/socket.adapter.js';
 
 async function bootstrap() {
   const env = loadEnv();
@@ -25,6 +26,8 @@ async function bootstrap() {
   // Lets SIGTERM close the database pool cleanly
   app.enableShutdownHooks();
   applyCors(app, env.data);
+  // Sockets share the port, origin checked
+  app.useWebSocketAdapter(new LineupIoAdapter(app, env.data));
   setupDocs(app);
   await app.listen(env.data.PORT);
 }

@@ -44,3 +44,4 @@ Not Started
 - B33b Solo Endpoints: 6 /solo/sessions routes, CLOCK, one open run a user
 - B34 Solo Persistence: one-tx save at run end, stats upsert, minute sweep
 - B35 REST Rate Limiting: throttler, user/IP/email keys, 429 with the wait
+- B36 Socket Gateway: JWT + version gate, origin check, one socket a user

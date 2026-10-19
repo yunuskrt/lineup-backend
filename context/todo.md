@@ -39,7 +39,7 @@ This todo file is for developer-side use.
 - [x] **Phase B33 — Solo Endpoints**: Start, guess and end-run REST endpoints validating server-side only.
 - [x] **Phase B34 — Solo Persistence**: Persist sessions, rounds, guesses and the derived per-user stats.
 - [x] **Phase B35 — REST Rate Limiting**: Throttler on guess and auth routes with an explained lockout.
-- [ ] **Phase B36 — Socket Gateway**: Socket.IO gateway with a JWT handshake and protocol version gate.
+- [x] **Phase B36 — Socket Gateway**: Socket.IO gateway with a JWT handshake and protocol version gate.
 - [ ] **Phase B37 — FIFO Matchmaking**: In-memory queue pairing the first two waiting clients into a room.
 - [ ] **Phase B38 — Duel Orchestration**: Filter coin flip, squad resolution and the alternating round loop.
 - [ ] **Phase B39 — Duel Events**: Typed emit and ack payloads for every state the duel screen can be in.

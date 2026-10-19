@@ -1,5 +1,8 @@
+import type { Server } from 'node:http';
 import { io, type Socket, type SocketOptions } from 'socket.io-client';
 import type { ManagerOptions } from 'socket.io-client';
+import request from 'supertest';
+import { PROTOCOL_VERSION } from '@/contract/protocol.js';
 
 type Options = Partial<ManagerOptions & SocketOptions>;
 
@@ -54,4 +57,48 @@ export function nextEvent<T = unknown>(
   return new Promise((resolve) => {
     socket.once(event, (payload: T) => resolve(payload));
   });
+}
+
+export type Recorded = { event: string; payload: unknown };
+
+// Every server event, in arrival order
+export function recordEvents(socket: Socket): Recorded[] {
+  const recorded: Recorded[] = [];
+  socket.onAny((event: string, payload: unknown) => {
+    recorded.push({ event, payload });
+  });
+  return recorded;
+}
+
+export type GuestPlayer = {
+  id: string;
+  handle: string;
+  cookie: string;
+  socket: Socket;
+};
+
+const cookieOf = (res: request.Response) =>
+  [res.headers['set-cookie'] ?? []]
+    .flat()
+    .map((c) => c.split(';')[0])
+    .join('; ');
+
+export async function gatewayToken(server: Server, cookie: string) {
+  const res = await request(server).get('/auth/token').set('Cookie', cookie);
+  return res.body.data.token as string;
+}
+
+// A fresh guest, connected at version N
+export async function connectGuest(
+  server: Server,
+  url: string,
+): Promise<GuestPlayer> {
+  const res = await request(server).post('/auth/guest');
+  const { id, handle } = res.body.data.user as { id: string; handle: string };
+  const cookie = cookieOf(res);
+  const token = await gatewayToken(server, cookie);
+  const socket = await connected(
+    openSocket(url, { token, protocolVersion: PROTOCOL_VERSION }),
+  );
+  return { id, handle, cookie, socket };
 }

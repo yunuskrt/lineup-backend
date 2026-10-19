@@ -15,11 +15,10 @@ export class ConnectionRegistry<S extends Connection = Socket> {
     return previous && previous.id !== socket.id ? previous : null;
   }
 
-  // A replaced socket's close leaves the new one
-  remove(userId: string, socket: S): void {
-    if (this.sockets.get(userId)?.id === socket.id) {
-      this.sockets.delete(userId);
-    }
+  // False for a replaced socket: the new one stays
+  remove(userId: string, socket: S): boolean {
+    if (this.sockets.get(userId)?.id !== socket.id) return false;
+    return this.sockets.delete(userId);
   }
 
   socketOf(userId: string): S | null {

@@ -1,5 +1,6 @@
 import { Logger, UseFilters } from '@nestjs/common';
 import {
+  ConnectedSocket,
   MessageBody,
   type OnGatewayConnection,
   type OnGatewayDisconnect,
@@ -17,13 +18,17 @@ import { ApiException } from '@/common/api-exception.js';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe.js';
 import type { User } from '@/contract/auth.js';
 import { type DuelCommand, duelCommandSchemas } from '@/contract/duel.js';
+import type { SocketAck } from '@/contract/socket.js';
 import { ConnectionRegistry } from '@/duel/connection-registry.js';
+import { DuelNotifier, roomOf } from '@/duel/duel-notifier.js';
+import { MatchmakingService } from '@/duel/matchmaking.service.js';
 import { SocketAuthService } from '@/duel/socket-auth.service.js';
 import {
   failureAck,
   handshakeRefusal,
   SocketEnvelopeFilter,
   socketError,
+  SUCCESS_ACK,
 } from '@/duel/socket-envelope.filter.js';
 
 // Set by the handshake, from the server only
@@ -38,11 +43,13 @@ export const UNKNOWN_COMMAND = 'Unknown command.';
 
 const COMMANDS = new Set<string>(Object.keys(duelCommandSchemas));
 
-export const roomOf = (userId: string) => `user:${userId}`;
-
-// Validated, then refused until B37–B41
-function refuseUntilOpen(command: DuelCommand, payload: unknown): never {
+function parseCommand(command: DuelCommand, payload: unknown): void {
   new ZodValidationPipe(duelCommandSchemas[command]).transform(payload);
+}
+
+// Validated, then refused until B38–B40
+function refuseUntilOpen(command: DuelCommand, payload: unknown): never {
+  parseCommand(command, payload);
   throw new ApiException('forbidden', DUELS_NOT_OPEN);
 }
 
@@ -59,10 +66,13 @@ export class DuelGateway
   constructor(
     private readonly auth: SocketAuthService,
     private readonly connections: ConnectionRegistry<DuelSocket>,
+    private readonly notifier: DuelNotifier,
+    private readonly matchmaking: MatchmakingService,
   ) {}
 
   // A refused socket never reaches a handler
   afterInit(server: DuelServer): void {
+    this.notifier.attach(server);
     server.use((socket, next) => {
       void this.admit(socket).then(next);
     });
@@ -77,23 +87,38 @@ export class DuelGateway
 
     const replaced = this.connections.register(user.id, socket);
     if (replaced) {
+      // The new socket starts idle
+      this.matchmaking.drop(user.id);
       replaced.emit('error', new ApiException('forbidden', REPLACED).error);
       replaced.disconnect(true);
     }
   }
 
   handleDisconnect(socket: DuelSocket): void {
-    this.connections.remove(socket.data.user.id, socket);
+    const { user } = socket.data;
+    if (this.connections.remove(user.id, socket)) {
+      this.matchmaking.drop(user.id);
+    }
   }
 
   @SubscribeMessage('queue:enter')
-  enterQueue(@MessageBody() payload: unknown): never {
-    return refuseUntilOpen('queue:enter', payload);
+  enterQueue(
+    @ConnectedSocket() socket: DuelSocket,
+    @MessageBody() payload: unknown,
+  ): SocketAck {
+    parseCommand('queue:enter', payload);
+    this.matchmaking.enter(socket.data.user);
+    return SUCCESS_ACK;
   }
 
   @SubscribeMessage('queue:leave')
-  leaveQueue(@MessageBody() payload: unknown): never {
-    return refuseUntilOpen('queue:leave', payload);
+  leaveQueue(
+    @ConnectedSocket() socket: DuelSocket,
+    @MessageBody() payload: unknown,
+  ): SocketAck {
+    parseCommand('queue:leave', payload);
+    this.matchmaking.leave(socket.data.user.id);
+    return SUCCESS_ACK;
   }
 
   @SubscribeMessage('filters:submit')

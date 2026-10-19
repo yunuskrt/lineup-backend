@@ -33,17 +33,21 @@ describe('ConnectionRegistry', () => {
     expect(registry.socketOf('u-1')).toBe(first);
   });
 
-  it('removes the current socket', () => {
+  it('removes the current socket, and says so', () => {
     registry.register('u-1', first);
-    registry.remove('u-1', first);
+    expect(registry.remove('u-1', first)).toBe(true);
     expect(registry.socketOf('u-1')).toBeNull();
   });
 
   it('leaves the newer socket when a replaced one closes', () => {
     registry.register('u-1', first);
     registry.register('u-1', second);
-    registry.remove('u-1', first);
+    expect(registry.remove('u-1', first)).toBe(false);
     expect(registry.socketOf('u-1')).toBe(second);
+  });
+
+  it('removes nothing for an unknown user', () => {
+    expect(registry.remove('u-9', first)).toBe(false);
   });
 
   it('knows no socket for an unknown user', () => {

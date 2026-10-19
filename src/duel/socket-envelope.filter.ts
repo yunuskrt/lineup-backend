@@ -30,6 +30,8 @@ export function socketError(error: unknown, logger: Logger): ApiError {
   return SERVER_ERROR;
 }
 
+export const SUCCESS_ACK: SocketAck = { success: true, data: null };
+
 export const failureAck = (error: ApiError): SocketAck => ({
   success: false,
   error,

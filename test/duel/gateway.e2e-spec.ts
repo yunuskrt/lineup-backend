@@ -135,7 +135,7 @@ describe('Duel gateway (e2e)', () => {
       const { socket } = await player();
       expect(socket.connected).toBe(true);
       // Guards or the HTTP interceptor would break this
-      expect(await ack(socket, 'queue:enter')).toEqual(
+      expect(await ack(socket, 'duel:forfeit')).toEqual(
         failure('forbidden', DUELS_NOT_OPEN),
       );
     });
@@ -276,7 +276,7 @@ describe('Duel gateway (e2e)', () => {
       });
       expect(await closed).toBe('io server disconnect');
       expect(second.connected).toBe(true);
-      expect(await ack(second, 'queue:leave')).toEqual(
+      expect(await ack(second, 'duel:forfeit')).toEqual(
         failure('forbidden', DUELS_NOT_OPEN),
       );
     });
@@ -323,7 +323,7 @@ describe('Duel gateway (e2e)', () => {
     it('reports a failed command sent with no ack as an error event', async () => {
       const { socket } = await player();
       const error = nextEvent(socket, 'error');
-      socket.emit('queue:enter');
+      socket.emit('duel:forfeit');
       expect(apiErrorSchema.parse(await error)).toMatchObject({
         code: 'forbidden',
       });

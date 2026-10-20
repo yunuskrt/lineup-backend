@@ -11,12 +11,11 @@ import { loadEnv } from '@/config/load-env.js';
 import { apiErrorSchema } from '@/contract/envelope.js';
 import { PROTOCOL_VERSION } from '@/contract/protocol.js';
 import { socketAckSchema } from '@/contract/socket.js';
+import { REPLACED, UNKNOWN_COMMAND } from '@/duel/duel.gateway.js';
 import {
-  DUELS_NOT_OPEN,
-  REPLACED,
-  UNKNOWN_COMMAND,
-} from '@/duel/duel.gateway.js';
-import { DUEL_START_MESSAGES } from '@/duel/duel-messages.js';
+  DUEL_PLAY_MESSAGES,
+  DUEL_START_MESSAGES,
+} from '@/duel/duel-messages.js';
 import { OUT_OF_DATE } from '@/duel/socket-auth.service.js';
 import { LineupIoAdapter, MAX_FRAME_BYTES } from '@/duel/socket.adapter.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
@@ -137,7 +136,7 @@ describe('Duel gateway (e2e)', () => {
       expect(socket.connected).toBe(true);
       // Guards or the HTTP interceptor would break this
       expect(await ack(socket, 'duel:forfeit')).toEqual(
-        failure('forbidden', DUELS_NOT_OPEN),
+        failure('forbidden', DUEL_PLAY_MESSAGES.noDuel),
       );
     });
 
@@ -278,7 +277,7 @@ describe('Duel gateway (e2e)', () => {
       expect(await closed).toBe('io server disconnect');
       expect(second.connected).toBe(true);
       expect(await ack(second, 'duel:forfeit')).toEqual(
-        failure('forbidden', DUELS_NOT_OPEN),
+        failure('forbidden', DUEL_PLAY_MESSAGES.noDuel),
       );
     });
 
@@ -311,14 +310,19 @@ describe('Duel gateway (e2e)', () => {
     });
 
     it.each([
-      ['duel:guess', [{ sessionId: 'd-1', guess: 'Zlatan' }]],
-      ['duel:forfeit', []],
-    ])('answers a valid %s with forbidden for now', async (event, args) => {
-      const { socket } = await player();
-      expect(await ack(socket, event, ...args)).toEqual(
-        failure('forbidden', DUELS_NOT_OPEN),
-      );
-    });
+      [
+        'duel:guess',
+        [{ sessionId: 'd-1', guess: 'Zlatan' }],
+        failure('session_over', DUEL_PLAY_MESSAGES.notRunning),
+      ],
+      ['duel:forfeit', [], failure('forbidden', DUEL_PLAY_MESSAGES.noDuel)],
+    ])(
+      'refuses a valid %s from a player in no duel',
+      async (event, args, refused) => {
+        const { socket } = await player();
+        expect(await ack(socket, event, ...args)).toEqual(refused);
+      },
+    );
 
     it('answers an unknown command that waits on an ack', async () => {
       const { socket } = await player();

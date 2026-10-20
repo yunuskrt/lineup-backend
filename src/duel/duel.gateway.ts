@@ -17,11 +17,17 @@ import type {
 import { ApiException } from '@/common/api-exception.js';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe.js';
 import type { User } from '@/contract/auth.js';
-import { type DuelCommand, duelCommandSchemas } from '@/contract/duel.js';
+import {
+  type DuelCommand,
+  duelCommandSchemas,
+  type DuelGuessRequest,
+  duelGuessRequestSchema,
+} from '@/contract/duel.js';
 import { type Filters, filtersSchema } from '@/contract/match.js';
 import type { SocketAck } from '@/contract/socket.js';
 import { ConnectionRegistry } from '@/duel/connection-registry.js';
 import { DuelNotifier, roomOf } from '@/duel/duel-notifier.js';
+import { DuelPlayService } from '@/duel/duel-play.service.js';
 import { DuelStartService } from '@/duel/duel-start.service.js';
 import { MatchmakingService } from '@/duel/matchmaking.service.js';
 import { SocketAuthService } from '@/duel/socket-auth.service.js';
@@ -39,7 +45,6 @@ type Events = DefaultEventsMap;
 export type DuelSocket = Socket<Events, Events, Events, SocketData>;
 export type DuelServer = Server<Events, Events, Events, SocketData>;
 
-export const DUELS_NOT_OPEN = "Duels aren't open yet.";
 export const REPLACED = "You're connected somewhere else.";
 export const UNKNOWN_COMMAND = 'Unknown command.';
 
@@ -47,12 +52,6 @@ const COMMANDS = new Set<string>(Object.keys(duelCommandSchemas));
 
 function parseCommand(command: DuelCommand, payload: unknown): void {
   new ZodValidationPipe(duelCommandSchemas[command]).transform(payload);
-}
-
-// Validated, then refused until B38b
-function refuseUntilOpen(command: DuelCommand, payload: unknown): never {
-  parseCommand(command, payload);
-  throw new ApiException('forbidden', DUELS_NOT_OPEN);
 }
 
 @WebSocketGateway()
@@ -71,6 +70,7 @@ export class DuelGateway
     private readonly notifier: DuelNotifier,
     private readonly matchmaking: MatchmakingService,
     private readonly start: DuelStartService,
+    private readonly play: DuelPlayService,
   ) {}
 
   // A refused socket never reaches a handler
@@ -134,13 +134,23 @@ export class DuelGateway
   }
 
   @SubscribeMessage('duel:guess')
-  guess(@MessageBody() payload: unknown): never {
-    return refuseUntilOpen('duel:guess', payload);
+  guess(
+    @ConnectedSocket() socket: DuelSocket,
+    @MessageBody(new ZodValidationPipe(duelGuessRequestSchema))
+    request: DuelGuessRequest,
+  ): SocketAck {
+    this.play.guess(socket.data.user, request);
+    return SUCCESS_ACK;
   }
 
   @SubscribeMessage('duel:forfeit')
-  forfeit(@MessageBody() payload: unknown): never {
-    return refuseUntilOpen('duel:forfeit', payload);
+  forfeit(
+    @ConnectedSocket() socket: DuelSocket,
+    @MessageBody() payload: unknown,
+  ): SocketAck {
+    parseCommand('duel:forfeit', payload);
+    this.play.forfeit(socket.data.user);
+    return SUCCESS_ACK;
   }
 
   private async admit(socket: DuelSocket): Promise<ExtendedError | undefined> {

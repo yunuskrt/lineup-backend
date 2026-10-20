@@ -11,6 +11,7 @@ import {
   MATCHMAKING_MESSAGES,
 } from '@/duel/duel-messages.js';
 import type { DuelNotifier } from '@/duel/duel-notifier.js';
+import type { DuelPlayService } from '@/duel/duel-play.service.js';
 import { DuelRooms } from '@/duel/duel-rooms.js';
 import { DuelStartService } from '@/duel/duel-start.service.js';
 import type { MatchSelectorService } from '@/matches/match-selector.service.js';
@@ -73,9 +74,11 @@ function setup(draw = 0.1) {
   const squads = { load: vi.fn().mockResolvedValue(SQUAD) };
   const findUniqueOrThrow = vi.fn().mockResolvedValue(MATCH_ROW);
   const random = () => draw;
+  const play = { start: vi.fn(), drop: vi.fn() };
   const service = new DuelStartService(
     rooms,
     notifier,
+    play as unknown as DuelPlayService,
     selector as unknown as MatchSelectorService,
     sides as unknown as SidePickerService,
     squads as unknown as SquadLoaderService,
@@ -102,6 +105,7 @@ function setup(draw = 0.1) {
     sides,
     squads,
     random,
+    play,
     service,
     eventsOf,
     last,
@@ -320,6 +324,16 @@ describe('DuelStartService', () => {
       expect(ctx.rooms.get(ctx.roomId)?.phase).toBe('playing');
     });
 
+    it('hands the playing room to the round loop', async () => {
+      const ctx = setup();
+      await bothSubmit(ctx);
+      await settle();
+      await vi.advanceTimersByTimeAsync(REVEAL_MS);
+      expect(ctx.play.start).toHaveBeenCalledExactlyOnceWith(
+        ctx.rooms.get(ctx.roomId),
+      );
+    });
+
     it('starts at once when loading outlasts the reveal', async () => {
       const ctx = setup();
       await bothSubmit(ctx);
@@ -470,6 +484,16 @@ describe('DuelStartService', () => {
       expect(ctx.last('b', 'error')).toMatchObject({
         message: MATCHMAKING_MESSAGES.opponentLeft,
       });
+    });
+
+    it('hands a playing room to the round loop', async () => {
+      const ctx = setup();
+      await bothSubmit(ctx);
+      await settle();
+      await vi.advanceTimersByTimeAsync(REVEAL_MS);
+      ctx.service.drop('a');
+      expect(ctx.play.drop).toHaveBeenCalledExactlyOnceWith('a');
+      expect(ctx.last('b', 'error')).toBeUndefined();
     });
 
     it('does nothing for a player in no room', () => {

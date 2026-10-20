@@ -11,3 +11,11 @@ export const DUEL_START_MESSAGES = {
   emptyPool: 'No match fits those filters. Try widening them.',
   emptiedSinceFlip: 'No match fits the winning filters.',
 } as const;
+
+export const DUEL_PLAY_MESSAGES = {
+  waitTurn: 'Wait for your turn.',
+  roundOver: 'That round had already ended.',
+  notRunning: 'This duel is not running.',
+  otherDuel: 'That guess is for another duel.',
+  noDuel: 'There is no duel to forfeit.',
+} as const;

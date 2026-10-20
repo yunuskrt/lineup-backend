@@ -18,6 +18,7 @@ import {
   MATCHMAKING_MESSAGES,
 } from '@/duel/duel-messages.js';
 import { DuelNotifier } from '@/duel/duel-notifier.js';
+import { DuelPlayService } from '@/duel/duel-play.service.js';
 import {
   type DuelRoom,
   type FiltersRoom,
@@ -60,6 +61,7 @@ export class DuelStartService implements OnModuleDestroy {
   constructor(
     private readonly rooms: DuelRooms,
     private readonly notifier: DuelNotifier,
+    private readonly play: DuelPlayService,
     private readonly selector: MatchSelectorService,
     private readonly sides: SidePickerService,
     private readonly squads: SquadLoaderService,
@@ -103,6 +105,10 @@ export class DuelStartService implements OnModuleDestroy {
   drop(userId: string): void {
     const room = this.rooms.roomOf(userId);
     if (!room) return;
+    if (room.phase === 'playing') {
+      this.play.drop(userId);
+      return;
+    }
     this.end(
       room,
       new ApiException('session_over', MATCHMAKING_MESSAGES.opponentLeft),
@@ -224,6 +230,7 @@ export class DuelStartService implements OnModuleDestroy {
     this.sendEach(playing, 'matchReady', (seat) =>
       toDuelSession(playing, seat),
     );
+    this.play.start(playing);
   }
 
   // A failed start reaches both players

@@ -2,7 +2,7 @@
 
 ## Status
 
-Not Started
+Complete
 
 ## Goals
 
@@ -17,7 +17,7 @@ Not Started
   - it applies every input through `applyTimed` and emits through `DuelNotifier`
   - a finished duel closes its room
 - **`src/duel/duel.gateway.ts`:** `duel:guess` and `duel:forfeit` become real handlers. `refuseUntilOpen` and `DUELS_NOT_OPEN` go, since all five commands are real.
-- **`src/duel/matchmaking.service.ts`:** `drop` sends a `playing` room to `DuelPlayService.drop` (**Drops**).
+- **`src/duel/duel-start.service.ts`:** `drop` hands a `playing` room to `DuelPlayService.drop` (**Drops**). Since B38a, `MatchmakingService.drop` passes every user who isn't queued to the start service.
 - **Tests:**
   - `src/duel/duel-events.spec.ts` (pure): the order for each **Events** row, both receivers' views of one step, the guesser-only `guessResolved`, and a catch-up over several expiries
   - `src/duel/duel-views.spec.ts`: `toDuelResult` for win, loss, draw and forfeit from both seats
@@ -83,6 +83,7 @@ The wording follows the mock's, which the web already shows.
 - **Until B40, a drop while `playing` is an immediate forfeit by the player who dropped.** The other player gets `finished` with `forfeit_win`. B40 puts the 20 s reconnect window in front of it.
 - A replaced connection counts as a drop (B37), so a second tab mid-duel forfeits the first. B40 turns this into a reconnect.
 - **A drop before `playing`** keeps B38a's behaviour.
+- **The refusal messages** go in `src/duel/duel-messages.ts`, next to B38a's.
 
 ## E2E
 
@@ -105,6 +106,8 @@ The wording follows the mock's, which the web already shows.
 
 ## Open Questions
 
+Settled at `/feature load`, as recommended.
+
 1. **How do the e2e tests reach an expiry?** The 15 s round can't be shortened (HC 11).
    - **Recommended: override `CLOCK` in the suite with a controllable clock, and step it past the deadline before sending the next input.** The catch-up applies the expiry exactly as the timer would. One case still waits out a real round, to prove the timer fires by itself.
    - Real waits only: three expiries take over 45 s per case.
@@ -121,7 +124,8 @@ The wording follows the mock's, which the web already shows.
 ## Notes
 
 - Scope: the second B38 spec, from round 1 to `finished`. Together with B38a, two browsers can duel to the end, with no persistence.
-- Depends on: B38a (the `playing` room, the views, `DuelNotifier`), B30 (the engine), B31 (`applyTimed`, `nextDeadline`)
+- Depends on: B38a (the `playing` room, the views, `DuelNotifier`, `DuelStartService.drop`), B30 (the engine), B31 (`applyTimed`, `nextDeadline`)
+- **Updated after B38a:** the drop routing and the messages file follow what B38a built (see its deviations).
 - Constraints:
   - **HC 1, 9–11, 18:**
     - the server decides every outcome
@@ -139,5 +143,63 @@ The wording follows the mock's, which the web already shows.
 - Verification:
   - `npm test`, `npm run test:e2e`, `npm run build`, `npm run lint`
   - By hand: two `socket.io-client` scripts play one duel to a draw, and another to a forfeit. Check that the log holds no guess text or squad player.
+
+**Deviations recorded during implementation**
+
+- **The views take a `Moment`:** a snapshot of lives, found, turn and round (`momentOf(room)` for the current one).
+  - `toDuelSession(room, seat, moment?)`
+  - `toDuelResult(room, result, seat, moment?)`, which also takes the engine's `GameResult` (the spec had `toDuelResult(room, seat)`)
+  - `toFoundPlayer(room, found, seat)`, which takes a `FoundPlayer` rather than a player id
+
+  Why: in a catch-up over several expiries, each `turnChanged` and `roundStarted` must show the duel at that instant, not after the whole step.
+- **`eventsFor(before, effects)` replays the step over the room before it,** updating the moment as each effect lands.
+- **`DuelPlayService.start(room)`** arms the first round's timer. `DuelStartService.begin` calls it right after `matchReady`.
+- **`playRejection` is exported.** `wrong_mode` and `unknown_seat` can't happen in a duel, so they throw (and so become `server_error`) instead of being given a message.
+- **When the catch-up ends the duel before the input lands:**
+  - a guess is refused with `session_over`, "This duel is not running."
+  - a forfeit is refused with "There is no duel to forfeit."
+
+  The `finished` events from the catch-up are still sent.
+- **A drop mid-duel sends `finished` to the dropping user's room too.** Their socket is gone, so only a replacing connection would see it, and it shows the duel ended.
+- **`PlayingRoom` doesn't keep the effects history yet.** B41 adds it, along with the rounds and guesses it saves.
+- **Gateway:**
+  - `duel:guess` validates through `@MessageBody(new ZodValidationPipe(duelGuessRequestSchema))`, and `duel:forfeit` through `parseCommand`
+  - `refuseUntilOpen` and `DUELS_NOT_OPEN` are gone
+  - the gateway suite's three placeholder cases now expect the real refusals: "There is no duel to forfeit." and "This duel is not running."
+- **Added `src/duel/duel.fixtures.ts`** (`playingRoom(firstSeat)`) for the events and play specs.
+- **E2E:**
+  - `CLOCK` is real time plus a skew
+  - an expiry happens when the suite adds 15.5 s of skew and then sends any guess, whose catch-up applies it; that guess is refused as `round_over`
+  - one case waits out a real round, under a 30 s timeout
+  - guesses use the seeded display names read from Postgres; full names are aliases
+- **Tests:**
+  - **Unit:** 1031 in all (36 new), in `duel-events.spec.ts`, `duel-play.service.spec.ts`, `duel-views.spec.ts` and `duel-start.service.spec.ts`
+  - **E2E:** 400 in all (11 new), in `test/duel/duel-play.e2e-spec.ts`
+- **Mutation checks:**
+  - `turnChanged` built from the state before the step fails the catch-up case
+  - `guessResolved` always to seat 0 fails 1 case
+  - a finished room left open fails 5
+  - a drop mid-duel not treated as a forfeit fails 1
+- **By hand,** on the built server (port 8081):
+  - a miss got `guessResolved` `not_in_xi` for the guesser only, and a guess out of turn got "Wait for your turn."
+  - a duel played to all 11 ended in `draw` for both, with 11 found
+  - a forfeit gave `loss` and `forfeit_win`, both `isForfeit`, and the winner could queue again at once
+  - the log held none of the 22 names, no guess text and no token
+  - the four guests were deleted
+- **Review:** no changes needed.
+  - **Checked:** a timer that fires a hair early finds no expiry, so the step changes nothing and the timer is re-armed at the same deadline. A round can't be skipped or charged early.
+  - **Checked:** a closed `playing` room never keeps a timer. Only `DuelPlayService` closes one, and it disarms first; `DuelStartService.end` only ever closes rooms before `playing`.
+  - **Checked:** the play service has no `await`, so a guess, a forfeit and a timer tick can't interleave on one room.
+  - **Checked:** `effect.text` is never read outside the engine. No log line was added, and every refusal message is fixed text (HC 2).
+  - **Checked:** every outcome comes from `applyTimed`; `src/duel/` only maps effects to events (HC 7, HC 9–11).
+  - **Accepted until B40:** a second tab mid-duel forfeits the first, and that new tab receives the `finished` loss while it is idle.
+- **At `/feature test`:** 2 new cases in `duel-play.service.spec.ts`. Unit tests are now 1033 in all (38 new in B38b).
+  - five expiries already due when a guess lands: the catch-up ends the duel (`finished` `win` for b), and the guess is refused with "This duel is not running."
+  - the same with a forfeit: refused with "There is no duel to forfeit.", and a's `finished` is a `loss` with `isForfeit: false`, since the clock decided it
+  - **Coverage from unit tests:**
+    - 100% lines, branches and functions for `duel-events.ts`, `duel-views.ts` and `duel-messages.ts`
+    - `duel-play.service.ts`: 100% functions, 91.67% branches. The two misses can't be reached from outside: `tick` finding a room that isn't `playing` (a duel's room is disarmed before it closes), and `arm` getting no deadline (only unfinished rooms are armed).
+    - `duel-start.service.ts`: 95.23% branches, the same two B38a misses
+    - `duel.gateway.ts` and `duel.module.ts` are wiring, covered by the 59 duel e2e cases
 
 ## History

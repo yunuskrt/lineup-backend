@@ -47,3 +47,4 @@ Not Started
 - B36 Socket Gateway: JWT + version gate, origin check, one socket a user
 - B37 FIFO Matchmaking: queue:enter/leave, in-memory rooms, 60s timeout
 - B38a Filters & Coin Flip: submit + pool check, 30s window, 2s reveal
+- B38b Duel Round Loop: guess/forfeit, timer per duel, events to finished

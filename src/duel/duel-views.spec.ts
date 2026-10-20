@@ -1,6 +1,7 @@
 import { duelPlayer } from '@/contract/contract.fixtures.js';
 import {
   coinFlipResultSchema,
+  duelResultSchema,
   duelSessionSchema,
   filterSubmissionSchema,
 } from '@/contract/duel.js';
@@ -9,8 +10,10 @@ import { applyTimed, createTimedGame } from '@/game/timed-game.js';
 import type { FlippingRoom, PlayingRoom } from '@/duel/duel-room.js';
 import {
   toCoinFlip,
+  toDuelResult,
   toDuelSession,
   toFilterSubmission,
+  toLifeLost,
 } from '@/duel/duel-views.js';
 import { IDENTITY, NAMES, SQUAD } from '@/matches/squad.fixtures.js';
 
@@ -123,5 +126,56 @@ describe('toDuelSession', () => {
     const room = playing();
     const over = { ...room, timed: { ...room.timed, round: null } };
     expect(() => toDuelSession(over, 0)).toThrow('no live round');
+  });
+});
+
+describe('toDuelResult', () => {
+  const duel = (
+    outcomes: readonly [
+      'win' | 'loss' | 'draw' | 'forfeit_win',
+      'win' | 'loss' | 'draw' | 'forfeit_win',
+    ],
+    isForfeit = false,
+  ) => ({ mode: 'duel' as const, outcomes, isForfeit });
+
+  it.each([
+    ['a win and a loss', duel(['win', 'loss'])],
+    ['a draw', duel(['draw', 'draw'])],
+    ['a forfeit', duel(['forfeit_win', 'loss'], true)],
+  ])('shows %s from each seat', (_, result) => {
+    const room = playing();
+    const forA = toDuelResult(room, result, 0);
+    const forB = toDuelResult(room, result, 1);
+
+    expect(duelResultSchema.parse(forA)).toEqual(forA);
+    expect(forA.outcome).toBe(result.outcomes[0]);
+    expect(forB.outcome).toBe(result.outcomes[1]);
+    expect(forA.isForfeit).toBe(result.isForfeit);
+    expect(forA.you).toEqual(forB.opponent);
+    expect(forA.match).toEqual(IDENTITY);
+    expect(forA.found).toMatchObject([{ id: 'p-alfa', foundBy: 'opponent' }]);
+    expect(forB.found).toMatchObject([{ id: 'p-alfa', foundBy: 'you' }]);
+  });
+
+  it('refuses a solo result', () => {
+    const solo = {
+      mode: 'solo' as const,
+      endReason: 'quit' as const,
+      livesRemaining: 3,
+    };
+    expect(() => toDuelResult(playing(), solo, 0)).toThrow('Not a duel');
+  });
+});
+
+describe('toLifeLost', () => {
+  it('names who lost it from each seat', () => {
+    expect(toLifeLost({ seat: 1, lives: 2 }, 1)).toEqual({
+      who: 'you',
+      lives: 2,
+    });
+    expect(toLifeLost({ seat: 1, lives: 2 }, 0)).toEqual({
+      who: 'opponent',
+      lives: 2,
+    });
   });
 });

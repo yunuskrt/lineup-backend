@@ -4,6 +4,7 @@ import { SYSTEM_CLOCK } from '@/common/clock.js';
 import { SYSTEM_RANDOM } from '@/common/random.js';
 import { ConnectionRegistry } from '@/duel/connection-registry.js';
 import { DuelNotifier } from '@/duel/duel-notifier.js';
+import { DuelPlayService } from '@/duel/duel-play.service.js';
 import { DuelRooms } from '@/duel/duel-rooms.js';
 import {
   DEFAULT_FILTER_WINDOW_MS,
@@ -31,6 +32,7 @@ import { MatchesModule } from '@/matches/matches.module.js';
     DuelRooms,
     MatchmakingService,
     DuelStartService,
+    DuelPlayService,
     SYSTEM_CLOCK,
     SYSTEM_RANDOM,
     { provide: QUEUE_TIMEOUT_MS, useValue: DEFAULT_QUEUE_TIMEOUT_MS },

@@ -4,10 +4,9 @@ import type { User } from '@/contract/auth.js';
 import type { DuelEventMap } from '@/contract/duel.js';
 import type { DuelNotifier } from '@/duel/duel-notifier.js';
 import { DuelRooms } from '@/duel/duel-rooms.js';
-import {
-  MATCHMAKING_MESSAGES,
-  MatchmakingService,
-} from '@/duel/matchmaking.service.js';
+import { MATCHMAKING_MESSAGES } from '@/duel/duel-messages.js';
+import type { DuelStartService } from '@/duel/duel-start.service.js';
+import { MatchmakingService } from '@/duel/matchmaking.service.js';
 
 const T0 = 1_000_000;
 const TIMEOUT_MS = 60_000;
@@ -33,10 +32,17 @@ function setup() {
     },
   } as unknown as DuelNotifier;
   const rooms = new DuelRooms();
-  const service = new MatchmakingService(rooms, notifier, clock, TIMEOUT_MS);
+  const start = { open: vi.fn(), drop: vi.fn() };
+  const service = new MatchmakingService(
+    rooms,
+    notifier,
+    start as unknown as DuelStartService,
+    clock,
+    TIMEOUT_MS,
+  );
   const eventsOf = (to: string) =>
     sent.filter((s) => s.to === to).map((s) => s.event);
-  return { clock, sent, rooms, service, eventsOf };
+  return { clock, sent, rooms, start, service, eventsOf };
 }
 
 function refusal(action: () => void): ApiException['error'] | null {
@@ -92,6 +98,13 @@ describe('MatchmakingService', () => {
         pairedAt: T0 + 500,
       });
       expect(rooms.roomOf('b')).toBe(room);
+    });
+
+    it('hands the new room to the start of the duel', () => {
+      const { service, rooms, start } = setup();
+      service.enter(user('a'));
+      service.enter(user('b'));
+      expect(start.open).toHaveBeenCalledExactlyOnceWith(rooms.roomOf('a'));
     });
 
     it('pairs in order of arrival', () => {
@@ -213,37 +226,15 @@ describe('MatchmakingService', () => {
       expect(sent.map((s) => s.event)).toEqual(['queued', 'queued']);
     });
 
-    it('ends the room and tells the opponent', () => {
-      const { service, sent, rooms } = setup();
+    it('hands a paired player to the start of the duel', () => {
+      const { service, start } = setup();
       service.enter(user('a'));
       service.enter(user('b'));
       service.drop('a');
-
-      expect(rooms.roomOf('a')).toBeNull();
-      expect(rooms.roomOf('b')).toBeNull();
-      expect(sent.at(-1)).toEqual({
-        to: 'b',
-        event: 'error',
-        payload: {
-          code: 'session_over',
-          message: MATCHMAKING_MESSAGES.opponentLeft,
-          retryAfterMs: null,
-        },
-      });
-      expect(sent.filter((s) => s.event === 'error')).toHaveLength(1);
+      expect(start.drop).toHaveBeenCalledExactlyOnceWith('a');
     });
 
-    it('lets the opponent left behind enter again', () => {
-      const { service, rooms } = setup();
-      service.enter(user('a'));
-      service.enter(user('b'));
-      service.drop('a');
-      service.enter(user('b'));
-      service.enter(user('c'));
-      expect(rooms.roomOf('b')?.players.map((p) => p.id)).toEqual(['b', 'c']);
-    });
-
-    it('does nothing for an idle player', () => {
+    it('sends nothing itself for an idle player', () => {
       const { service, sent } = setup();
       service.drop('a');
       expect(sent).toEqual([]);

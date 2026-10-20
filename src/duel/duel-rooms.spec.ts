@@ -8,12 +8,14 @@ describe('DuelRooms', () => {
     rooms = new DuelRooms();
   });
 
-  it('opens one room for both players', () => {
+  it('opens one room for both players, on filters', () => {
     const room = rooms.open(duelPlayer('a'), duelPlayer('b'), 5);
     expect(room).toEqual({
       id: expect.any(String),
       players: [duelPlayer('a'), duelPlayer('b')],
       pairedAt: 5,
+      phase: 'filters',
+      submissions: [null, null],
     });
     expect(rooms.roomOf('a')).toBe(room);
     expect(rooms.roomOf('b')).toBe(room);
@@ -46,5 +48,20 @@ describe('DuelRooms', () => {
 
   it('knows no room for a user who was never paired', () => {
     expect(rooms.roomOf('a')).toBeNull();
+  });
+
+  it('saves a newer state of an open room', () => {
+    const room = rooms.open(duelPlayer('a'), duelPlayer('b'), 0);
+    const next = { ...room, submissions: [null, null] as const };
+    expect(rooms.save(next)).toBe(true);
+    expect(rooms.get(room.id)).toBe(next);
+    expect(rooms.roomOf('b')).toBe(next);
+  });
+
+  it('refuses to save a closed room back', () => {
+    const room = rooms.open(duelPlayer('a'), duelPlayer('b'), 0);
+    rooms.close(room.id);
+    expect(rooms.save(room)).toBe(false);
+    expect(rooms.get(room.id)).toBeNull();
   });
 });

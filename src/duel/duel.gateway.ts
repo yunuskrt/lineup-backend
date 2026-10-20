@@ -18,9 +18,11 @@ import { ApiException } from '@/common/api-exception.js';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe.js';
 import type { User } from '@/contract/auth.js';
 import { type DuelCommand, duelCommandSchemas } from '@/contract/duel.js';
+import { type Filters, filtersSchema } from '@/contract/match.js';
 import type { SocketAck } from '@/contract/socket.js';
 import { ConnectionRegistry } from '@/duel/connection-registry.js';
 import { DuelNotifier, roomOf } from '@/duel/duel-notifier.js';
+import { DuelStartService } from '@/duel/duel-start.service.js';
 import { MatchmakingService } from '@/duel/matchmaking.service.js';
 import { SocketAuthService } from '@/duel/socket-auth.service.js';
 import {
@@ -47,7 +49,7 @@ function parseCommand(command: DuelCommand, payload: unknown): void {
   new ZodValidationPipe(duelCommandSchemas[command]).transform(payload);
 }
 
-// Validated, then refused until B38–B40
+// Validated, then refused until B38b
 function refuseUntilOpen(command: DuelCommand, payload: unknown): never {
   parseCommand(command, payload);
   throw new ApiException('forbidden', DUELS_NOT_OPEN);
@@ -68,6 +70,7 @@ export class DuelGateway
     private readonly connections: ConnectionRegistry<DuelSocket>,
     private readonly notifier: DuelNotifier,
     private readonly matchmaking: MatchmakingService,
+    private readonly start: DuelStartService,
   ) {}
 
   // A refused socket never reaches a handler
@@ -122,8 +125,12 @@ export class DuelGateway
   }
 
   @SubscribeMessage('filters:submit')
-  submitFilters(@MessageBody() payload: unknown): never {
-    return refuseUntilOpen('filters:submit', payload);
+  async submitFilters(
+    @ConnectedSocket() socket: DuelSocket,
+    @MessageBody(new ZodValidationPipe(filtersSchema)) filters: Filters,
+  ): Promise<SocketAck> {
+    await this.start.submit(socket.data.user, filters);
+    return SUCCESS_ACK;
   }
 
   @SubscribeMessage('duel:guess')

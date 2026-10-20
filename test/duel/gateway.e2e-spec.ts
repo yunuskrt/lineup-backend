@@ -16,6 +16,7 @@ import {
   REPLACED,
   UNKNOWN_COMMAND,
 } from '@/duel/duel.gateway.js';
+import { DUEL_START_MESSAGES } from '@/duel/duel-messages.js';
 import { OUT_OF_DATE } from '@/duel/socket-auth.service.js';
 import { LineupIoAdapter, MAX_FRAME_BYTES } from '@/duel/socket.adapter.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
@@ -302,8 +303,14 @@ describe('Duel gateway (e2e)', () => {
       expect(JSON.stringify(result)).not.toContain('1999');
     });
 
+    it('answers filters from a player in no duel with forbidden', async () => {
+      const { socket } = await player();
+      expect(await ack(socket, 'filters:submit', VALID_FILTERS)).toEqual(
+        failure('forbidden', DUEL_START_MESSAGES.filtersClosed),
+      );
+    });
+
     it.each([
-      ['filters:submit', [VALID_FILTERS]],
       ['duel:guess', [{ sessionId: 'd-1', guess: 'Zlatan' }]],
       ['duel:forfeit', []],
     ])('answers a valid %s with forbidden for now', async (event, args) => {

@@ -46,3 +46,4 @@ Not Started
 - B35 REST Rate Limiting: throttler, user/IP/email keys, 429 with the wait
 - B36 Socket Gateway: JWT + version gate, origin check, one socket a user
 - B37 FIFO Matchmaking: queue:enter/leave, in-memory rooms, 60s timeout
+- B38a Filters & Coin Flip: submit + pool check, 30s window, 2s reveal

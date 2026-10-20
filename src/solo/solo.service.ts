@@ -25,6 +25,7 @@ import {
 } from '@/matches/match-refs.js';
 import { MatchSelectorService } from '@/matches/match-selector.service.js';
 import { SquadLoaderService } from '@/matches/squad-loader.service.js';
+import { toGuessResult } from '@/matches/squad-views.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 import { SoloPersistenceService } from '@/solo/solo-persistence.service.js';
 import {
@@ -34,11 +35,7 @@ import {
   type PlayedRun,
 } from '@/solo/solo-run.js';
 import { SoloSessionStore } from '@/solo/solo-session.store.js';
-import {
-  toGuessResult,
-  toSoloSession,
-  toSoloSummary,
-} from '@/solo/solo-views.js';
+import { toSoloSession, toSoloSummary } from '@/solo/solo-views.js';
 
 export const SOLO_MESSAGES = {
   emptyPool: 'No match fits those filters. Try widening them.',

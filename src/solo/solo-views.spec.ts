@@ -1,4 +1,3 @@
-import { guessResultSchema } from '@/contract/round.js';
 import { soloSessionSchema, soloSummarySchema } from '@/contract/solo.js';
 import type { TimedInput } from '@/game/timed-game.js';
 import {
@@ -8,11 +7,7 @@ import {
   playedRun,
   SQUAD,
 } from '@/solo/solo.fixtures.js';
-import {
-  toGuessResult,
-  toSoloSession,
-  toSoloSummary,
-} from '@/solo/solo-views.js';
+import { toSoloSession, toSoloSummary } from '@/solo/solo-views.js';
 
 const QUIT: TimedInput = { kind: 'quit' };
 
@@ -69,39 +64,6 @@ describe('toSoloSession', () => {
   it('shows the lives the clock has taken', () => {
     const session = toSoloSession(playedRun([{ kind: 'tick' }, 15_401]));
     expect(session.lives).toBe(2);
-  });
-});
-
-describe('toGuessResult', () => {
-  it('carries the revealed player for a new correct name', () => {
-    const result = toGuessResult(
-      { kind: 'correct_new', playerId: 'p-delta' },
-      SQUAD,
-    );
-    expect(guessResultSchema.parse(result)).toEqual(result);
-    expect(result).toEqual({
-      outcome: 'correct_new',
-      player: SQUAD.players[3],
-    });
-  });
-
-  it('carries only the id for a name already found', () => {
-    const result = toGuessResult(
-      { kind: 'already_found', playerId: 'p-delta' },
-      SQUAD,
-    );
-    expect(result).toEqual({ outcome: 'already_found', playerId: 'p-delta' });
-  });
-
-  it('carries nothing for a name not in the XI', () => {
-    const result = toGuessResult({ kind: 'not_in_xi' }, SQUAD);
-    expect(result).toEqual({ outcome: 'not_in_xi' });
-  });
-
-  it('refuses an id outside the squad without naming it', () => {
-    expect(() =>
-      toGuessResult({ kind: 'correct_new', playerId: 'p-zulu' }, SQUAD),
-    ).toThrow('A found player is missing from the squad');
   });
 });
 

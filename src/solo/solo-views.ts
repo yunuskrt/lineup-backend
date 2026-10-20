@@ -1,19 +1,10 @@
 import type { Tier } from '@/contract/common.js';
 import type { RevealedPlayer } from '@/contract/player.js';
-import type { GuessResult } from '@/contract/round.js';
 import type { SoloSession, SoloSummary } from '@/contract/solo.js';
-import type { GuessVerdict } from '@/game/collisions.js';
 import { runFigures } from '@/game/summary.js';
 import { toMatchInPlay } from '@/matches/match-refs.js';
-import type { LoadedSquad } from '@/matches/squad-loader.service.js';
+import { revealOf } from '@/matches/squad-views.js';
 import type { PlayedRun } from '@/solo/solo-run.js';
-
-// The only way a squad player reaches a payload
-function revealOf(squad: LoadedSquad, playerId: string): RevealedPlayer {
-  const player = squad.players.find((entry) => entry.id === playerId);
-  if (!player) throw new Error('A found player is missing from the squad');
-  return player;
-}
 
 function foundOf(run: PlayedRun): RevealedPlayer[] {
   return run.timed.game.found.map(({ playerId }) =>
@@ -31,23 +22,6 @@ export function toSoloSession(run: PlayedRun): SoloSession {
     found: foundOf(run),
     round,
   };
-}
-
-export function toGuessResult(
-  verdict: GuessVerdict,
-  squad: LoadedSquad,
-): GuessResult {
-  switch (verdict.kind) {
-    case 'correct_new':
-      return {
-        outcome: 'correct_new',
-        player: revealOf(squad, verdict.playerId),
-      };
-    case 'already_found':
-      return { outcome: 'already_found', playerId: verdict.playerId };
-    case 'not_in_xi':
-      return { outcome: 'not_in_xi' };
-  }
 }
 
 export function toSoloSummary(run: PlayedRun, tier: Tier): SoloSummary {

@@ -8,10 +8,8 @@ import { duelEventSchemas } from '@/contract/duel.js';
 import { PROTOCOL_VERSION } from '@/contract/protocol.js';
 import { socketAckSchema } from '@/contract/socket.js';
 import { ConnectionRegistry } from '@/duel/connection-registry.js';
-import {
-  MATCHMAKING_MESSAGES,
-  QUEUE_TIMEOUT_MS,
-} from '@/duel/matchmaking.service.js';
+import { MATCHMAKING_MESSAGES } from '@/duel/duel-messages.js';
+import { QUEUE_TIMEOUT_MS } from '@/duel/matchmaking.service.js';
 import { LineupIoAdapter } from '@/duel/socket.adapter.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 import {

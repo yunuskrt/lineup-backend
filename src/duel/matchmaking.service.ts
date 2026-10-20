@@ -4,19 +4,14 @@ import { CLOCK, type Clock } from '@/common/clock.js';
 import type { User } from '@/contract/auth.js';
 import { MAX_LIVES } from '@/contract/constants.js';
 import type { DuelPlayer } from '@/contract/duel.js';
+import { MATCHMAKING_MESSAGES } from '@/duel/duel-messages.js';
 import { DuelNotifier } from '@/duel/duel-notifier.js';
 import { DuelRooms } from '@/duel/duel-rooms.js';
+import { DuelStartService } from '@/duel/duel-start.service.js';
 import { MatchmakingQueue } from '@/duel/matchmaking-queue.js';
 
 export const QUEUE_TIMEOUT_MS = Symbol('QUEUE_TIMEOUT_MS');
 export const DEFAULT_QUEUE_TIMEOUT_MS = 60_000;
-
-export const MATCHMAKING_MESSAGES = {
-  alreadyQueued: "You're already in the queue.",
-  inDuel: "You're already in a duel.",
-  notQueued: "You're not in the queue.",
-  opponentLeft: 'Your opponent left.',
-} as const;
 
 @Injectable()
 export class MatchmakingService implements OnModuleDestroy {
@@ -26,6 +21,7 @@ export class MatchmakingService implements OnModuleDestroy {
   constructor(
     private readonly rooms: DuelRooms,
     private readonly notifier: DuelNotifier,
+    private readonly start: DuelStartService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(QUEUE_TIMEOUT_MS) private readonly timeoutMs: number,
   ) {}
@@ -65,19 +61,7 @@ export class MatchmakingService implements OnModuleDestroy {
       this.stopTimer(userId);
       return;
     }
-    const room = this.rooms.roomOf(userId);
-    if (!room) return;
-
-    this.rooms.close(room.id);
-    const left = new ApiException(
-      'session_over',
-      MATCHMAKING_MESSAGES.opponentLeft,
-    );
-    for (const player of room.players) {
-      if (player.id !== userId) {
-        this.notifier.toUser(player.id, 'error', left.error);
-      }
-    }
+    this.start.drop(userId);
   }
 
   onModuleDestroy(): void {
@@ -87,7 +71,7 @@ export class MatchmakingService implements OnModuleDestroy {
 
   private pair(first: DuelPlayer, second: DuelPlayer): void {
     this.stopTimer(first.id);
-    this.rooms.open(first, second, this.clock.now());
+    const room = this.rooms.open(first, second, this.clock.now());
     this.notifier.toUser(first.id, 'paired', {
       phase: 'paired',
       opponent: second,
@@ -96,6 +80,7 @@ export class MatchmakingService implements OnModuleDestroy {
       phase: 'paired',
       opponent: first,
     });
+    this.start.open(room);
   }
 
   private startTimer(userId: string, since: number): void {

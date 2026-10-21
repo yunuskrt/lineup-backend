@@ -1,28 +1,14 @@
-import type { Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { AppModule } from '@/app.module.js';
-import { CLOCK } from '@/common/clock.js';
-import { RANDOM } from '@/common/random.js';
-import { loadEnv } from '@/config/load-env.js';
 import { GRACE_MS, ROUND_MS } from '@/contract/constants.js';
-import { type DuelResult, type DuelSession } from '@/contract/duel.js';
+import type { DuelResult } from '@/contract/duel.js';
 import { historyPageSchema, profileSchema } from '@/contract/profile.js';
-import { NO_PREFERENCE } from '@/game/coin-flip.js';
-import { ConnectionRegistry } from '@/duel/connection-registry.js';
 import { DuelPersistenceService } from '@/duel/duel-persistence.service.js';
-import { RECONNECT_WINDOW } from '@/duel/duel-play.service.js';
-import { FLIP_REVEAL_MS } from '@/duel/duel-start.service.js';
-import { LineupIoAdapter } from '@/duel/socket.adapter.js';
-import { PrismaService } from '@/prisma/prisma.service.js';
+import type { PrismaService } from '@/prisma/prisma.service.js';
+import { DuelHarness } from '@test/duel/duel-harness.js';
 import {
   ackOf,
-  connectGuest,
   type GuestPlayer,
   nextEvent,
-  removeGuests,
 } from '@test/duel/socket-client.js';
 
 const WINDOW_MS = 1_000;
@@ -36,44 +22,18 @@ type Duel = {
   names: string[];
 };
 
-// A wins the flip, so B (seat 1) names first
-const DRAW = 0.1;
-let skew = 0;
-
 describe('Duel persistence (e2e)', () => {
-  let app: NestExpressApplication;
-  let server: Server;
-  let url: string;
-  let registry: ConnectionRegistry;
+  let h: DuelHarness;
   let persistence: DuelPersistenceService;
   let prisma: PrismaService;
-  const guests: GuestPlayer[] = [];
 
-  async function player(): Promise<GuestPlayer> {
-    const guest = await connectGuest(server, url);
-    guests.push(guest);
-    return guest;
-  }
+  const player = () => h.client();
 
+  // A wins the flip, so B (seat 1) names first
   async function duel(): Promise<Duel> {
-    const [a, b] = await Promise.all([player(), player()]);
-    const aPaired = nextEvent(a.socket, 'paired');
-    await ackOf(a.socket, 'queue:enter');
-    await ackOf(b.socket, 'queue:enter');
-    await aPaired;
-
-    const aReady = nextEvent<DuelSession>(a.socket, 'matchReady');
-    const bReady = nextEvent(b.socket, 'matchReady');
-    await ackOf(a.socket, 'filters:submit', NO_PREFERENCE);
-    await ackOf(b.socket, 'filters:submit', NO_PREFERENCE);
-    const [{ sessionId, match }] = await Promise.all([aReady, bReady]);
-
-    const lineups = await prisma.lineup.findMany({
-      where: { matchTeam: { matchId: match.id, side: match.side } },
-      select: { player: { select: { name: true } } },
-      orderBy: { slot: 'asc' },
-    });
-    return { a, b, sessionId, names: lineups.map((row) => row.player.name) };
+    const { a, b, sessionId, match } = await h.pair();
+    const { names } = await h.squadOf(match);
+    return { a, b, sessionId, names };
   }
 
   const guess = (p: GuestPlayer, d: Duel, text: string) =>
@@ -115,14 +75,14 @@ describe('Duel persistence (e2e)', () => {
   }
 
   async function historyOf(p: GuestPlayer) {
-    const res = await request(server)
+    const res = await request(h.server)
       .get('/profile/history')
       .set('Cookie', p.cookie);
     return historyPageSchema.parse(res.body.data).entries;
   }
 
   async function statsOf(p: GuestPlayer) {
-    const res = await request(server).get('/profile').set('Cookie', p.cookie);
+    const res = await request(h.server).get('/profile').set('Cookie', p.cookie);
     return profileSchema.parse(res.body.data).stats;
   }
 
@@ -133,53 +93,19 @@ describe('Duel persistence (e2e)', () => {
   }
 
   beforeAll(async () => {
-    const env = loadEnv();
-    if (!env.success) throw new Error('E2E needs a valid .env');
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(FLIP_REVEAL_MS)
-      .useValue(100)
-      .overrideProvider(RECONNECT_WINDOW)
-      .useValue(WINDOW_MS)
-      .overrideProvider(RANDOM)
-      .useValue(() => DRAW)
-      .overrideProvider(CLOCK)
-      .useValue({ now: () => Date.now() + skew })
-      .compile();
-    app = moduleRef.createNestApplication<NestExpressApplication>({
-      bodyParser: false,
-    });
-    app.useWebSocketAdapter(new LineupIoAdapter(app, env.data));
-    await app.listen(0, '127.0.0.1');
-    server = app.getHttpServer();
-    url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    registry = app.get(ConnectionRegistry);
-    persistence = app.get(DuelPersistenceService);
-    prisma = app.get(PrismaService);
+    h = await DuelHarness.boot({ windowMs: WINDOW_MS });
+    persistence = h.app.get(DuelPersistenceService);
+    prisma = h.prisma;
   });
 
-  beforeEach(() => {
-    skew = 0;
-  });
-
-  afterEach(async () => {
-    for (const p of guests) p.socket.close();
-    await vi.waitFor(() => {
-      for (const p of guests) expect(registry.socketOf(p.id)).toBeNull();
-    });
-  });
-
-  afterAll(async () => {
-    await removeGuests(
-      prisma,
-      guests.map((p) => p.id),
-    );
-    await app.close();
-  });
+  beforeEach(() => h.resetClock());
+  afterEach(() => h.settle());
+  afterAll(() => h.close());
 
   it('saves a duel lost on lives for both players', async () => {
     const d = await duel();
     // Five expiries, alternating: B runs out first
-    skew += PAST_DEADLINE * 5;
+    h.skew(PAST_DEADLINE * 5);
     const result = await finish(d.a, () => guess(d.a, d, MISS));
     expect(result).toMatchObject({ outcome: 'win', isForfeit: false });
 

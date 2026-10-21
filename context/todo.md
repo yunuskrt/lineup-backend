@@ -46,7 +46,7 @@ This todo file is for developer-side use.
 - [x] **Phase B40 — Disconnect Handling**: 20s reconnect window, running clock, forfeit and result routing.
 - [x] **Phase B41 — Duel Persistence**: Write duel sessions, rounds, guesses and results from the gateway.
 - [x] **Phase B42 — Socket Rate Limiting**: Per-connection guess throttling outside the HTTP pipeline.
-- [ ] **Phase B43 — Duel Integration Harness**: Two simulated clients covering win, loss, draw and forfeit.
+- [x] **Phase B43 — Duel Integration Harness**: Two simulated clients covering win, loss, draw and forfeit.
 - [ ] **Phase B15 — Ingestion Harness**: Rerunnable runner with provider client, disk cache and rate limits. → scraper repo
 - [ ] **Phase B16 — Match Metadata Ingest**: Fixtures, scores, dates and competitions across 2000–2026. → scraper repo
 - [ ] **Phase B17 — Entity Resolution**: Normalize and dedupe clubs and players, then build base alias sets. → scraper repo

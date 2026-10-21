@@ -1,41 +1,20 @@
-import type { Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Test } from '@nestjs/testing';
-import { AppModule } from '@/app.module.js';
-import { CLOCK } from '@/common/clock.js';
-import { RANDOM } from '@/common/random.js';
-import { loadEnv } from '@/config/load-env.js';
-import { GRACE_MS, ROUND_MS } from '@/contract/constants.js';
 import {
-  type DuelResult,
-  duelEventSchemas,
-  type DuelSession,
-} from '@/contract/duel.js';
+  GRACE_MS,
+  RECONNECT_WINDOW_MS,
+  ROUND_MS,
+} from '@/contract/constants.js';
+import type { DuelResult, DuelSession } from '@/contract/duel.js';
 import type { DuelFoundPlayer } from '@/contract/player.js';
-import { socketAckSchema } from '@/contract/socket.js';
-import { NO_PREFERENCE } from '@/game/coin-flip.js';
-import { ConnectionRegistry } from '@/duel/connection-registry.js';
 import { DUEL_PLAY_MESSAGES } from '@/duel/duel-messages.js';
-import { FILTER_WINDOW_MS, FLIP_REVEAL_MS } from '@/duel/duel-start.service.js';
-import { LineupIoAdapter } from '@/duel/socket.adapter.js';
-import { PrismaService } from '@/prisma/prisma.service.js';
-import {
-  ackOf,
-  connectGuest,
-  type GuestPlayer,
-  nextEvent,
-  type Recorded,
-  recordEvents,
-  removeGuests,
-} from '@test/duel/socket-client.js';
+import { type Client, DuelHarness } from '@test/duel/duel-harness.js';
+import { nextEvent } from '@test/duel/socket-client.js';
 
 const OK = { success: true, data: null };
 const PAST_DEADLINE = ROUND_MS + GRACE_MS + 100;
 // Far from any squad name
 const MISS = 'Zzyzx Qwertyuiop';
 
-type Player = GuestPlayer & { events: Recorded[] };
+type Player = Client;
 type Duel = {
   a: Player;
   b: Player;
@@ -46,66 +25,23 @@ type Duel = {
   everyone: string[];
 };
 
-// A wins the flip, so B names first
-const DRAW = 0.1;
-// The server's clock runs ahead by this much
-let skew = 0;
-
 const refused = (code: string, message: string) => ({
   success: false,
   error: { code, message, retryAfterMs: null },
 });
 
 describe('Duel round loop (e2e)', () => {
-  let app: NestExpressApplication;
-  let server: Server;
-  let url: string;
-  let registry: ConnectionRegistry;
-  let prisma: PrismaService;
-  const guests: string[] = [];
-  const players: Player[] = [];
+  let h: DuelHarness;
 
-  async function player(): Promise<Player> {
-    const guest = await connectGuest(server, url);
-    guests.push(guest.id);
-    const joined = { ...guest, events: recordEvents(guest.socket) };
-    players.push(joined);
-    return joined;
-  }
+  const ack = (p: Player, event: string, ...args: unknown[]) =>
+    h.ack(p, event, ...args);
 
-  async function ack(p: Player, event: string, ...args: unknown[]) {
-    const result = await ackOf(p.socket, event, ...args);
-    expect(socketAckSchema.safeParse(result).success).toBe(true);
-    return result;
-  }
-
+  // A wins the flip, so B names first
   async function duel(): Promise<Duel> {
-    const [a, b] = await Promise.all([player(), player()]);
-    const aPaired = nextEvent(a.socket, 'paired');
-    await ack(a, 'queue:enter');
-    await ack(b, 'queue:enter');
-    await aPaired;
-
-    const aReady = nextEvent<DuelSession>(a.socket, 'matchReady');
-    const bReady = nextEvent(b.socket, 'matchReady');
-    await ack(a, 'filters:submit', NO_PREFERENCE);
-    await ack(b, 'filters:submit', NO_PREFERENCE);
-    const [{ sessionId, match }] = await Promise.all([aReady, bReady]);
-
-    const lineups = await prisma.lineup.findMany({
-      where: { matchTeam: { matchId: match.id } },
-      select: {
-        slot: true,
-        matchTeam: { select: { side: true } },
-        player: { select: { name: true } },
-      },
-      orderBy: { slot: 'asc' },
-    });
-    const names = lineups
-      .filter((row) => row.matchTeam.side === match.side)
-      .map((row) => row.player.name);
-    const everyone = lineups.map((row) => row.player.name);
-    return { a, b, sessionId, names, everyone };
+    const { a, b, sessionId, match } = await h.pair();
+    const squad = await h.squadOf(match);
+    const everyone = [...squad.names, ...squad.others];
+    return { a, b, sessionId, names: squad.names, everyone };
   }
 
   const guess = (p: Player, d: Duel, text: string) =>
@@ -123,51 +59,16 @@ describe('Duel round loop (e2e)', () => {
       .at(-1)?.payload as T;
 
   beforeAll(async () => {
-    const env = loadEnv();
-    if (!env.success) throw new Error('E2E needs a valid .env');
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(FILTER_WINDOW_MS)
-      .useValue(5_000)
-      .overrideProvider(FLIP_REVEAL_MS)
-      .useValue(100)
-      .overrideProvider(RANDOM)
-      .useValue(() => DRAW)
-      .overrideProvider(CLOCK)
-      .useValue({ now: () => Date.now() + skew })
-      .compile();
-    app = moduleRef.createNestApplication<NestExpressApplication>({
-      bodyParser: false,
-    });
-    app.useWebSocketAdapter(new LineupIoAdapter(app, env.data));
-    await app.listen(0, '127.0.0.1');
-    server = app.getHttpServer();
-    url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    registry = app.get(ConnectionRegistry);
-    prisma = app.get(PrismaService);
-  });
-
-  beforeEach(() => {
-    skew = 0;
-  });
-
-  afterEach(async () => {
-    const done = players.splice(0);
-    for (const p of done) {
-      for (const { event, payload } of p.events) {
-        const schema = duelEventSchemas[event as keyof typeof duelEventSchemas];
-        expect(schema?.safeParse(payload).success, event).toBe(true);
-      }
-      p.socket.close();
-    }
-    await vi.waitFor(() => {
-      for (const p of done) expect(registry.socketOf(p.id)).toBeNull();
+    // The real window: no case drops a socket
+    h = await DuelHarness.boot({
+      filterWindowMs: 5_000,
+      windowMs: RECONNECT_WINDOW_MS,
     });
   });
 
-  afterAll(async () => {
-    await removeGuests(prisma, guests);
-    await app.close();
-  });
+  beforeEach(() => h.resetClock());
+  afterEach(() => h.settle());
+  afterAll(() => h.close());
 
   describe('a guess', () => {
     it('reveals a correct name to both and hands over the turn', async () => {
@@ -256,7 +157,7 @@ describe('Duel round loop (e2e)', () => {
     it('costs the player on turn a life once the round runs out', async () => {
       const d = await duel();
       const aRound = nextEvent<DuelSession>(d.a.socket, 'roundStarted');
-      skew += PAST_DEADLINE;
+      h.skew(PAST_DEADLINE);
 
       // Any input catches the clock up first
       expect(await guess(d.a, d, d.names[0])).toEqual(
@@ -299,11 +200,11 @@ describe('Duel round loop (e2e)', () => {
       const finished = nextEvent<DuelResult>(d.a.socket, 'finished');
       for (const name of d.names.slice(0, 2)) {
         // B times out, then A names one
-        skew += PAST_DEADLINE;
+        h.skew(PAST_DEADLINE);
         await guess(d.a, d, MISS);
         expect(await guess(d.a, d, name)).toEqual(OK);
       }
-      skew += PAST_DEADLINE;
+      h.skew(PAST_DEADLINE);
       expect(await guess(d.a, d, MISS)).toEqual(
         refused('session_over', DUEL_PLAY_MESSAGES.notRunning),
       );

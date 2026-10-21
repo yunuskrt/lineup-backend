@@ -22,6 +22,9 @@ import { PrismaService } from '@/prisma/prisma.service.js';
 import {
   ackOf,
   connected,
+  connectGuest,
+  gatewayToken,
+  guestSession,
   nextEvent,
   openSocket,
   type Refusal,
@@ -35,12 +38,6 @@ const VALID_FILTERS = {
   era: { from: 2000, to: 2025 },
 };
 const NOW_S = () => Math.floor(Date.now() / 1000);
-
-const cookieHeader = (res: request.Response) =>
-  [res.headers['set-cookie'] ?? []]
-    .flat()
-    .map((c) => c.split(';')[0])
-    .join('; ');
 
 const failure = (code: string, message: string) => ({
   success: false,
@@ -62,15 +59,13 @@ describe('Duel gateway (e2e)', () => {
   const http = () => request(app.getHttpServer());
 
   async function guest() {
-    const res = await http().post('/auth/guest');
-    const id = res.body.data.user.id as string;
-    guests.push(id);
-    return { id, cookie: cookieHeader(res) };
+    const session = await guestSession(app.getHttpServer());
+    guests.push(session.id);
+    return session;
   }
 
   async function tokenFor(cookie: string) {
-    const res = await http().get('/auth/token').set('Cookie', cookie);
-    const token = res.body.data.token as string;
+    const token = await gatewayToken(app.getHttpServer(), cookie);
     tokensIssued.push(token);
     return token;
   }
@@ -83,12 +78,11 @@ describe('Duel gateway (e2e)', () => {
 
   // A fresh guest, connected at version N
   async function player() {
-    const { id, cookie } = await guest();
-    const token = await tokenFor(cookie);
-    const socket = await connected(
-      open({ token, protocolVersion: PROTOCOL_VERSION }),
-    );
-    return { id, cookie, token, socket };
+    const joined = await connectGuest(app.getHttpServer(), url);
+    guests.push(joined.id);
+    tokensIssued.push(joined.token);
+    sockets.push(joined.socket);
+    return joined;
   }
 
   async function ack(socket: Socket, event: string, ...args: unknown[]) {

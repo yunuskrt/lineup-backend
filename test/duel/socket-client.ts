@@ -75,6 +75,7 @@ export type GuestPlayer = {
   id: string;
   handle: string;
   cookie: string;
+  token: string;
   socket: Socket;
 };
 
@@ -89,19 +90,24 @@ export async function gatewayToken(server: Server, cookie: string) {
   return res.body.data.token as string;
 }
 
+// A fresh guest's session, no socket yet
+export async function guestSession(server: Server) {
+  const res = await request(server).post('/auth/guest');
+  const { id, handle } = res.body.data.user as { id: string; handle: string };
+  return { id, handle, cookie: cookieOf(res) };
+}
+
 // A fresh guest, connected at version N
 export async function connectGuest(
   server: Server,
   url: string,
 ): Promise<GuestPlayer> {
-  const res = await request(server).post('/auth/guest');
-  const { id, handle } = res.body.data.user as { id: string; handle: string };
-  const cookie = cookieOf(res);
+  const { id, handle, cookie } = await guestSession(server);
   const token = await gatewayToken(server, cookie);
   const socket = await connected(
     openSocket(url, { token, protocolVersion: PROTOCOL_VERSION }),
   );
-  return { id, handle, cookie, socket };
+  return { id, handle, cookie, token, socket };
 }
 
 // A duel saves after finished: retry past a late one

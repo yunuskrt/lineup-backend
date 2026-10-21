@@ -14,6 +14,7 @@ import {
 import { DUEL_PLAY_MESSAGES } from '@/duel/duel-messages.js';
 import { eventsFor } from '@/duel/duel-events.js';
 import { DuelNotifier } from '@/duel/duel-notifier.js';
+import { DuelPersistenceService } from '@/duel/duel-persistence.service.js';
 import {
   otherSeat,
   type PlayingRoom,
@@ -52,6 +53,7 @@ export class DuelPlayService implements OnModuleDestroy {
   constructor(
     private readonly rooms: DuelRooms,
     private readonly notifier: DuelNotifier,
+    private readonly persistence: DuelPersistenceService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(RECONNECT_WINDOW) private readonly windowMs: number,
   ) {}
@@ -179,11 +181,17 @@ export class DuelPlayService implements OnModuleDestroy {
   // State first, then events: a handler sees it
   private apply(room: PlayingRoom, input: TimedInput): TimedStep {
     const step = applyTimed(room.timed, input, this.clock.now());
-    const next: PlayingRoom = { ...room, timed: step.timed };
+    // A refusal still carries the catch-up effects
+    const next: PlayingRoom = {
+      ...room,
+      timed: step.timed,
+      effects: [...room.effects, ...step.effects],
+    };
     if (step.timed.game.result) {
       this.disarm(room.id);
       this.closeWindow(room.id, 0);
       this.closeWindow(room.id, 1);
+      this.persistence.record(next);
       this.rooms.close(room.id);
     } else {
       this.rooms.save(next);

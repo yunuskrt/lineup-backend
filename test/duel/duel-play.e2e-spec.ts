@@ -27,6 +27,7 @@ import {
   nextEvent,
   type Recorded,
   recordEvents,
+  removeGuests,
 } from '@test/duel/socket-client.js';
 
 const OK = { success: true, data: null };
@@ -164,7 +165,7 @@ describe('Duel round loop (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({ where: { id: { in: guests } } });
+    await removeGuests(prisma, guests);
     await app.close();
   });
 

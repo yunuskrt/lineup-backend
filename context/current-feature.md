@@ -50,3 +50,4 @@ Not Started
 - B38b Duel Round Loop: guess/forfeit, timer per duel, events to finished
 - B39 Duel Events: typed socket maps, fail-closed emits, x-socket catalogue
 - B40 Disconnect Handling: 20s window, rejoin snapshot, 10s/5s heartbeat
+- B41 Duel Persistence: one-tx duel save after finished, W/L/D, 60s retry

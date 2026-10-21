@@ -1,20 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { runRecord } from '@/game/run-record.js';
 import { runFigures } from '@/game/summary.js';
-import { Prisma } from '@/generated/prisma/client.js';
+import type { Prisma } from '@/generated/prisma/client.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
+import { failureKind, isAlreadySaved } from '@/prisma/save-errors.js';
 import type { PlayedRun } from '@/solo/solo-run.js';
 import { recordGame } from '@/users/stats-writer.js';
-
-const UNIQUE_VIOLATION = 'P2002';
-
-// The run id is the key: a second save collides
-function isAlreadySaved(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === UNIQUE_VIOLATION
-  );
-}
 
 async function write(tx: Prisma.TransactionClient, run: PlayedRun) {
   const result = run.timed.game.result;
@@ -76,6 +67,7 @@ async function write(tx: Prisma.TransactionClient, run: PlayedRun) {
     totalGuesses: guesses.length,
     bestStreak: runFigures(run.firstRound, run.effects).bestStreak,
     isPerfectClear: result.endReason === 'perfect_clear',
+    duelOutcome: null,
   });
 }
 
@@ -92,14 +84,7 @@ export class SoloPersistenceService {
       return true;
     } catch (error) {
       if (isAlreadySaved(error)) return true;
-      // The id and error class only: never the rows
-      const kind =
-        error instanceof Prisma.PrismaClientKnownRequestError
-          ? error.code
-          : error instanceof Error
-            ? error.name
-            : 'unknown';
-      this.logger.error(`Run ${run.id} was not saved (${kind})`);
+      this.logger.error(`Run ${run.id} was not saved (${failureKind(error)})`);
       return false;
     }
   }

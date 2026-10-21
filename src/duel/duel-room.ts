@@ -4,7 +4,7 @@ import type { Filters, MatchIdentity } from '@/contract/match.js';
 import type { RoundTiming } from '@/contract/round.js';
 import type { CoinFlip } from '@/game/coin-flip.js';
 import type { Seat } from '@/game/engine.js';
-import type { TimedGame } from '@/game/timed-game.js';
+import type { TimedEffect, TimedGame } from '@/game/timed-game.js';
 import type { LoadedSquad } from '@/matches/squad-loader.service.js';
 
 // Seat 0 queued first; the id is the sessionId
@@ -33,6 +33,8 @@ export type PlayingRoom = RoomBase & {
   readonly squad: LoadedSquad;
   readonly timed: TimedGame;
   readonly firstRound: RoundTiming;
+  // Holds guess texts: never logged or sent
+  readonly effects: readonly TimedEffect[];
   // Each seat's reconnect deadline, while away
   readonly away: readonly [number | null, number | null];
 };

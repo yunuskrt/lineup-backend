@@ -5,6 +5,7 @@ import { GRACE_MS, ROUND_MS } from '@/contract/constants.js';
 import type { DuelEventMap } from '@/contract/duel.js';
 import { DUEL_PLAY_MESSAGES } from '@/duel/duel-messages.js';
 import type { DuelNotifier } from '@/duel/duel-notifier.js';
+import type { DuelPersistenceService } from '@/duel/duel-persistence.service.js';
 import { DuelPlayService, playRejection } from '@/duel/duel-play.service.js';
 import type { PlayingRoom } from '@/duel/duel-room.js';
 import { DuelRooms } from '@/duel/duel-rooms.js';
@@ -42,6 +43,13 @@ function setup() {
       sent.push({ to: `socket:${socket.id}`, event, payload });
     },
   } as unknown as DuelNotifier;
+  // Each finished room, and what had gone out by then
+  const recorded: { room: PlayingRoom; sentBefore: number }[] = [];
+  const persistence = {
+    record: (finished: PlayingRoom) => {
+      recorded.push({ room: finished, sentBefore: sent.length });
+    },
+  } as unknown as DuelPersistenceService;
   const rooms = new DuelRooms();
   const opened = rooms.open(duelPlayer('a'), duelPlayer('b'), T0);
   const room: PlayingRoom = { ...playingRoom(0), id: opened.id };
@@ -49,6 +57,7 @@ function setup() {
   const service = new DuelPlayService(
     rooms,
     notifier,
+    persistence,
     { now: () => Date.now() },
     WINDOW_MS,
   );
@@ -61,7 +70,17 @@ function setup() {
   const current = () => rooms.get(room.id) as PlayingRoom | null;
   const guess = (id: string, text: string) =>
     service.guess(user(id), { sessionId: room.id, guess: text });
-  return { sent, rooms, room, service, eventsOf, last, current, guess };
+  return {
+    sent,
+    recorded,
+    rooms,
+    room,
+    service,
+    eventsOf,
+    last,
+    current,
+    guess,
+  };
 }
 
 function refusal(action: () => void) {
@@ -492,6 +511,92 @@ describe('DuelPlayService', () => {
     vi.advanceTimersByTime(DEADLINE * 3);
     expect(ctx.eventsOf('a')).toEqual(['opponentConnection']);
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('DuelPlayService record', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const kinds = (room: PlayingRoom | null) =>
+    room?.effects.map((effect) => effect.kind);
+
+  it('logs every effect, from guesses and from the clock', () => {
+    const ctx = setup();
+    ctx.guess('a', 'zulu');
+    expect(kinds(ctx.current())).toEqual(['guess_resolved']);
+
+    ctx.guess('a', 'alfa');
+    vi.advanceTimersByTime(DEADLINE + 1);
+    expect(kinds(ctx.current())).toEqual([
+      'guess_resolved',
+      'guess_resolved',
+      'player_revealed',
+      'round_ended',
+      'round_started',
+      'life_lost',
+      'round_ended',
+      'round_started',
+    ]);
+    expect(ctx.recorded).toEqual([]);
+  });
+
+  it('logs nothing for a refused guess', () => {
+    const ctx = setup();
+    ctx.guess('a', 'zulu');
+    refusal(() => ctx.guess('b', 'alfa'));
+    expect(kinds(ctx.current())).toEqual(['guess_resolved']);
+  });
+
+  it('keeps the catch-up a late guess brought', () => {
+    const ctx = setup();
+    vi.setSystemTime(T0 + DEADLINE + 5);
+    refusal(() => ctx.guess('a', 'alfa'));
+    expect(kinds(ctx.current())).toEqual([
+      'life_lost',
+      'round_ended',
+      'round_started',
+    ]);
+  });
+
+  it.each([
+    ['lives out', () => vi.advanceTimersByTime((DEADLINE + 1) * 5)],
+    [
+      'a forfeit',
+      (ctx: ReturnType<typeof setup>) => ctx.service.forfeit(user('b')),
+    ],
+    [
+      'an expired window',
+      (ctx: ReturnType<typeof setup>) => {
+        ctx.service.drop('b');
+        vi.advanceTimersByTime(WINDOW_MS);
+      },
+    ],
+    [
+      'all 11 named',
+      (ctx: ReturnType<typeof setup>) =>
+        NAMES.forEach((name, index) => ctx.guess(index % 2 ? 'b' : 'a', name)),
+    ],
+  ])('hands over the duel once on %s', (_, end) => {
+    const ctx = setup();
+    end(ctx);
+    vi.advanceTimersByTime(60_000);
+
+    expect(ctx.recorded).toHaveLength(1);
+    const [{ room, sentBefore }] = ctx.recorded;
+    expect(room.id).toBe(ctx.room.id);
+    expect(room.timed.game.result).not.toBeNull();
+    expect(room.effects.at(-1)?.kind).toBe('game_over');
+    expect(room.effects.filter((e) => e.kind === 'round_ended')).toHaveLength(
+      room.timed.game.round,
+    );
+    // Recorded before the finished events go out
+    expect(ctx.sent.slice(sentBefore).map((s) => s.event)).toContain(
+      'finished',
+    );
+    expect(ctx.sent.slice(0, sentBefore).map((s) => s.event)).not.toContain(
+      'finished',
+    );
   });
 });
 

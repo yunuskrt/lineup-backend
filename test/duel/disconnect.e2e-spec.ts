@@ -33,6 +33,7 @@ import {
   openSocket,
   type Recorded,
   recordEvents,
+  removeGuests,
 } from '@test/duel/socket-client.js';
 
 const WINDOW_MS = 2_000;
@@ -160,7 +161,7 @@ describe('Disconnect handling (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({ where: { id: { in: guests } } });
+    await removeGuests(prisma, guests);
     await app.close();
   });
 

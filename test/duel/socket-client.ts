@@ -3,6 +3,7 @@ import { io, type Socket, type SocketOptions } from 'socket.io-client';
 import type { ManagerOptions } from 'socket.io-client';
 import request from 'supertest';
 import { PROTOCOL_VERSION } from '@/contract/protocol.js';
+import type { PrismaService } from '@/prisma/prisma.service.js';
 
 type Options = Partial<ManagerOptions & SocketOptions>;
 
@@ -101,4 +102,14 @@ export async function connectGuest(
     openSocket(url, { token, protocolVersion: PROTOCOL_VERSION }),
   );
   return { id, handle, cookie, socket };
+}
+
+// A duel saves after finished: retry past a late one
+export async function removeGuests(prisma: PrismaService, ids: string[]) {
+  await vi.waitFor(async () => {
+    await prisma.gameSession.deleteMany({
+      where: { participants: { some: { userId: { in: ids } } } },
+    });
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+  });
 }

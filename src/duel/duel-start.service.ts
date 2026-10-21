@@ -223,6 +223,7 @@ export class DuelStartService implements OnModuleDestroy {
       ...resolved,
       phase: 'playing',
       timed,
+      effects: [],
       away: [null, null],
       // A new game always has round 1 running
       firstRound: timed.round!,

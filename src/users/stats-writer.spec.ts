@@ -6,6 +6,7 @@ const GAME: FinishedGame = {
   totalGuesses: 6,
   bestStreak: 3,
   isPerfectClear: false,
+  duelOutcome: null,
 };
 
 type Call = { sql: string; values: unknown[] };
@@ -28,7 +29,7 @@ describe('recordGame', () => {
     expect(calls).toHaveLength(2);
     expect(calls[0].sql).toMatch(/INSERT INTO user_stats/);
     expect(calls[0].sql).toMatch(/ON CONFLICT \(user_id\) DO UPDATE/);
-    expect(calls[0].values).toEqual(['user-1', 0, 3, 4, 6]);
+    expect(calls[0].values).toEqual(['user-1', 0, 0, 0, 0, 3, 4, 6]);
     expect(calls[1].sql).toMatch(/UPDATE user_stats SET favourite_club_id/);
   });
 
@@ -43,13 +44,35 @@ describe('recordGame', () => {
   it('counts a perfect clear', async () => {
     const { tx, calls } = txSpy();
     await recordGame(tx, 'user-1', { ...GAME, isPerfectClear: true });
-    expect(calls[0].values[1]).toBe(1);
+    expect(calls[0].values[4]).toBe(1);
   });
 
-  it('leaves the duel results alone', async () => {
+  it('adds no result for a solo game', async () => {
     const { tx, calls } = txSpy();
     await recordGame(tx, 'user-1', GAME);
-    expect(calls[0].sql).not.toMatch(/wins|losses|draws/);
+    expect(calls[0].values.slice(1, 4)).toEqual([0, 0, 0]);
+  });
+
+  it.each([
+    ['win', [1, 0, 0]],
+    ['forfeit_win', [1, 0, 0]],
+    ['loss', [0, 1, 0]],
+    ['draw', [0, 0, 1]],
+  ] as const)('counts a duel %s', async (outcome, counts) => {
+    const { tx, calls } = txSpy();
+    await recordGame(tx, 'user-1', { ...GAME, duelOutcome: outcome });
+    expect(calls[0].values.slice(1, 4)).toEqual(counts);
+    expect(calls[0].values[4]).toBe(0);
+  });
+
+  it('adds each result to the stored count', async () => {
+    const { tx, calls } = txSpy();
+    await recordGame(tx, 'user-1', GAME);
+    for (const column of ['wins', 'losses', 'draws']) {
+      expect(calls[0].sql).toContain(
+        `${column} = user_stats.${column} + EXCLUDED.${column}`,
+      );
+    }
   });
 
   it('picks the favourite club by the user id only', async () => {

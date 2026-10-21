@@ -5,6 +5,11 @@ import { SYSTEM_RANDOM } from '@/common/random.js';
 import { RECONNECT_WINDOW_MS } from '@/contract/constants.js';
 import { ConnectionRegistry } from '@/duel/connection-registry.js';
 import { DuelNotifier } from '@/duel/duel-notifier.js';
+import {
+  DEFAULT_DUEL_RETRY_MS,
+  DUEL_RETRY_MS,
+  DuelPersistenceService,
+} from '@/duel/duel-persistence.service.js';
 import { DuelPlayService, RECONNECT_WINDOW } from '@/duel/duel-play.service.js';
 import { DuelRooms } from '@/duel/duel-rooms.js';
 import {
@@ -34,12 +39,14 @@ import { MatchesModule } from '@/matches/matches.module.js';
     MatchmakingService,
     DuelStartService,
     DuelPlayService,
+    DuelPersistenceService,
     SYSTEM_CLOCK,
     SYSTEM_RANDOM,
     { provide: QUEUE_TIMEOUT_MS, useValue: DEFAULT_QUEUE_TIMEOUT_MS },
     { provide: FILTER_WINDOW_MS, useValue: DEFAULT_FILTER_WINDOW_MS },
     { provide: FLIP_REVEAL_MS, useValue: DEFAULT_FLIP_REVEAL_MS },
     { provide: RECONNECT_WINDOW, useValue: RECONNECT_WINDOW_MS },
+    { provide: DUEL_RETRY_MS, useValue: DEFAULT_DUEL_RETRY_MS },
   ],
 })
 export class DuelModule {}

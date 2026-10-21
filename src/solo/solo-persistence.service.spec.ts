@@ -119,9 +119,12 @@ describe('SoloPersistenceService', () => {
   it('counts the run into the stats', async () => {
     const { service, tx } = prismaWith();
     await service.save(finished());
-    // user id, perfect clears, streak, correct, total
+    // user, results, clears, streak, correct, total
     expect(tx.$executeRaw.mock.calls[0].slice(1)).toEqual([
       'user-1',
+      0,
+      0,
+      0,
       0,
       2,
       2,

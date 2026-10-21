@@ -95,12 +95,13 @@ export class DuelGateway
 
     const replaced = this.connections.register(user.id, socket);
     if (replaced) {
-      // The new socket starts idle
-      this.matchmaking.drop(user.id);
+      // Mid-duel the new socket takes the seat over
+      if (!this.play.isPlaying(user.id)) this.matchmaking.drop(user.id);
       const error = new ApiException('forbidden', REPLACED).error;
       this.notifier.toSocket(replaced, 'error', error);
       replaced.disconnect(true);
     }
+    this.play.rejoin(user.id, socket);
   }
 
   handleDisconnect(socket: DuelSocket): void {

@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage } from 'node:http';
 import type { INestApplicationContext } from '@nestjs/common';
+import type { ServerOptions } from 'socket.io';
+import { RECONNECT_WINDOW_MS } from '@/contract/constants.js';
 import type { Env } from '@/config/env.schema.js';
 import {
   LineupIoAdapter,
@@ -32,6 +34,13 @@ describe('socketServerOptions', () => {
     });
   });
 
+  it('notices a silent drop inside the 20 s window', () => {
+    const { pingInterval = 0, pingTimeout = 0 } = socketServerOptions(ENV);
+    expect(pingInterval).toBe(10_000);
+    expect(pingTimeout).toBe(5_000);
+    expect(pingInterval + pingTimeout).toBeLessThan(RECONNECT_WINDOW_MS);
+  });
+
   it('trusts the web app and the API origin, as the REST check does', () => {
     expect(allows('http://localhost:3000')).toBe(true);
     expect(allows('http://localhost:8080')).toBe(true);
@@ -50,11 +59,14 @@ describe('LineupIoAdapter', () => {
     const io = adapter.createIOServer(0, {
       maxHttpBufferSize: 10_000_000,
       serveClient: true,
-      pingTimeout: 5_000,
-    });
+      pingTimeout: 60_000,
+      connectTimeout: 1_234,
+    } as ServerOptions);
 
     expect(io.engine.opts.maxHttpBufferSize).toBe(MAX_FRAME_BYTES);
     expect(io.engine.opts.pingTimeout).toBe(5_000);
+    // A key the env leaves alone is kept
+    expect(io._connectTimeout).toBe(1_234);
     expect(io.serveClient()).toBe(false);
     await io.close();
   });

@@ -24,5 +24,6 @@ export function playingRoom(firstSeat: Seat = 0): PlayingRoom {
     squad: SQUAD,
     timed,
     firstRound: timed.round!,
+    away: [null, null],
   };
 }

@@ -356,16 +356,5 @@ describe('Duel round loop (e2e)', () => {
         refused('forbidden', DUEL_PLAY_MESSAGES.noDuel),
       );
     });
-
-    it('treats a drop mid-duel as a forfeit', async () => {
-      const d = await duel();
-      const finished = nextEvent<DuelResult>(d.b.socket, 'finished');
-      d.a.socket.close();
-      expect(await finished).toMatchObject({
-        outcome: 'forfeit_win',
-        isForfeit: true,
-      });
-      expect(await ack(d.b, 'queue:enter')).toEqual(OK);
-    });
   });
 });

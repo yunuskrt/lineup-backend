@@ -230,7 +230,8 @@ describe('FIFO matchmaking (e2e)', () => {
       );
       await enter(a);
       const { waitedMs } = await timedOut;
-      expect(waitedMs).toBeGreaterThanOrEqual(TIMEOUT_MS);
+      // Node timers can fire a ms before Date.now
+      expect(waitedMs).toBeGreaterThanOrEqual(TIMEOUT_MS - 5);
 
       expect(await enter(a)).toEqual(OK);
       await enter(b);

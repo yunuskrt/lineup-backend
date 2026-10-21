@@ -8,10 +8,13 @@ import type { DuelNotifier } from '@/duel/duel-notifier.js';
 import { DuelPlayService, playRejection } from '@/duel/duel-play.service.js';
 import type { PlayingRoom } from '@/duel/duel-room.js';
 import { DuelRooms } from '@/duel/duel-rooms.js';
+import type { DuelSocket } from '@/duel/duel.gateway.js';
 import { playingRoom, T0 } from '@/duel/duel.fixtures.js';
 import { NAMES } from '@/matches/squad.fixtures.js';
 
 const DEADLINE = ROUND_MS + GRACE_MS;
+const WINDOW_MS = 20_000;
+const SOCKET = { id: 's-new' } as unknown as DuelSocket;
 
 const user = (id: string): User => ({
   id,
@@ -31,14 +34,24 @@ function setup() {
     toUser: (to: string, event: keyof DuelEventMap, payload: unknown) => {
       sent.push({ to, event, payload });
     },
+    toSocket: (
+      socket: { id: string },
+      event: keyof DuelEventMap,
+      payload: unknown,
+    ) => {
+      sent.push({ to: `socket:${socket.id}`, event, payload });
+    },
   } as unknown as DuelNotifier;
   const rooms = new DuelRooms();
   const opened = rooms.open(duelPlayer('a'), duelPlayer('b'), T0);
   const room: PlayingRoom = { ...playingRoom(0), id: opened.id };
   rooms.save(room);
-  const service = new DuelPlayService(rooms, notifier, {
-    now: () => Date.now(),
-  });
+  const service = new DuelPlayService(
+    rooms,
+    notifier,
+    { now: () => Date.now() },
+    WINDOW_MS,
+  );
   service.start(room);
 
   const eventsOf = (to: string) =>
@@ -265,15 +278,92 @@ describe('DuelPlayService', () => {
     });
   });
 
-  describe('drop', () => {
-    it('forfeits for the player who dropped', () => {
+  describe('a drop', () => {
+    it('opens a window and tells the opponent', () => {
+      const ctx = setup();
+      ctx.service.drop('b');
+      expect(ctx.sent).toEqual([
+        {
+          to: 'a',
+          event: 'opponentConnection',
+          payload: {
+            status: 'reconnecting',
+            reconnectDeadline: T0 + WINDOW_MS,
+          },
+        },
+      ]);
+      expect(ctx.current()?.away).toEqual([null, T0 + WINDOW_MS]);
+    });
+
+    it('opens one window, however often the seat drops', () => {
+      const ctx = setup();
+      ctx.service.drop('b');
+      vi.advanceTimersByTime(1_000);
+      ctx.service.drop('b');
+      expect(ctx.eventsOf('a')).toEqual(['opponentConnection']);
+      expect(ctx.current()?.away).toEqual([null, T0 + WINDOW_MS]);
+    });
+
+    it('lets the clock run while the seat is away', () => {
       const ctx = setup();
       ctx.service.drop('a');
-      expect(ctx.last('b', 'finished')).toMatchObject({
+      vi.advanceTimersByTime(DEADLINE + 1);
+      expect(ctx.last('b', 'lifeLost')).toEqual({ who: 'opponent', lives: 2 });
+    });
+
+    it('forfeits the seat once the window runs out', () => {
+      const ctx = setup();
+      ctx.service.drop('b');
+      vi.advanceTimersByTime(WINDOW_MS - 1);
+      expect(ctx.eventsOf('a')).not.toContain('finished');
+
+      vi.advanceTimersByTime(1);
+      expect(ctx.eventsOf('a').slice(-2)).toEqual([
+        'opponentConnection',
+        'finished',
+      ]);
+      expect(
+        ctx.sent.filter((s) => s.event === 'opponentConnection').at(-1),
+      ).toMatchObject({
+        payload: { status: 'forfeited', reconnectDeadline: null },
+      });
+      expect(ctx.last('a', 'finished')).toMatchObject({
         outcome: 'forfeit_win',
         isForfeit: true,
       });
-      expect(ctx.rooms.roomOf('b')).toBeNull();
+      expect(ctx.rooms.roomOf('a')).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('ends on lives, not a forfeit, if the clock gets there first', () => {
+      const ctx = setup();
+      // Four expiries, alternating: a is down to 1
+      vi.advanceTimersByTime((DEADLINE + 1) * 4);
+      ctx.service.drop('a');
+      vi.advanceTimersByTime(DEADLINE + 1);
+
+      expect(ctx.last('b', 'finished')).toMatchObject({
+        outcome: 'win',
+        isForfeit: false,
+      });
+      const notices = ctx.sent.filter((s) => s.event === 'opponentConnection');
+      expect(notices.map((s) => s.payload)).toEqual([
+        { status: 'reconnecting', reconnectDeadline: expect.any(Number) },
+      ]);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('forfeits the first seat to run out when both are away', () => {
+      const ctx = setup();
+      ctx.service.drop('a');
+      vi.advanceTimersByTime(1_000);
+      ctx.service.drop('b');
+      vi.advanceTimersByTime(WINDOW_MS);
+
+      expect(ctx.last('b', 'finished')).toMatchObject({
+        outcome: 'forfeit_win',
+      });
+      expect(ctx.last('a', 'finished')).toMatchObject({ outcome: 'loss' });
       expect(vi.getTimerCount()).toBe(0);
     });
 
@@ -284,11 +374,123 @@ describe('DuelPlayService', () => {
     });
   });
 
-  it('clears the round timer on module destroy', () => {
+  describe('rejoin', () => {
+    it('resumes inside the window and tells both', () => {
+      const ctx = setup();
+      ctx.service.drop('a');
+      vi.advanceTimersByTime(5_000);
+      ctx.service.rejoin('a', SOCKET);
+
+      const back = ctx.sent.filter((s) => s.to === 'socket:s-new');
+      expect(back.map((s) => s.event)).toEqual(['disconnected', 'matchReady']);
+      expect(back[0].payload).toEqual({
+        status: 'connected',
+        reconnectDeadline: null,
+      });
+      expect(back[1].payload).toMatchObject({
+        sessionId: ctx.room.id,
+        you: { id: 'a' },
+        turn: 'you',
+      });
+      expect(ctx.last('b', 'opponentConnection')).toEqual({
+        status: 'connected',
+        reconnectDeadline: null,
+      });
+      expect(ctx.current()?.away).toEqual([null, null]);
+    });
+
+    it('closes the window, so it never forfeits', () => {
+      const ctx = setup();
+      ctx.service.drop('b');
+      ctx.service.rejoin('b', SOCKET);
+      vi.advanceTimersByTime(WINDOW_MS + 1);
+      expect(ctx.sent.map((s) => s.event)).not.toContain('finished');
+    });
+
+    it('shows the clock as it is now', () => {
+      const ctx = setup();
+      ctx.service.drop('a');
+      // The round timer is late: catch-up first
+      vi.setSystemTime(T0 + DEADLINE + 5);
+      ctx.service.rejoin('a', SOCKET);
+      const snapshot = ctx.sent.find(
+        (s) => s.to === 'socket:s-new' && s.event === 'matchReady',
+      );
+      expect(snapshot?.payload).toMatchObject({
+        you: { lives: 2 },
+        turn: 'opponent',
+      });
+    });
+
+    it('keeps the first window from ending a second absence early', () => {
+      const ctx = setup();
+      ctx.service.drop('b');
+      ctx.service.rejoin('b', SOCKET);
+      vi.advanceTimersByTime(3_000);
+      ctx.service.drop('b');
+
+      // The first window would have ended here
+      vi.advanceTimersByTime(WINDOW_MS - 3_000);
+      expect(ctx.eventsOf('a')).not.toContain('finished');
+      vi.advanceTimersByTime(3_000);
+      expect(ctx.last('a', 'finished')).toMatchObject({
+        outcome: 'forfeit_win',
+      });
+    });
+
+    it('opens a fresh window on a second drop', () => {
+      const ctx = setup();
+      ctx.service.drop('b');
+      ctx.service.rejoin('b', SOCKET);
+      vi.advanceTimersByTime(3_000);
+      ctx.service.drop('b');
+      expect(ctx.current()?.away).toEqual([null, T0 + 3_000 + WINDOW_MS]);
+    });
+
+    it('hands a replacing socket the duel, telling nobody else', () => {
+      const ctx = setup();
+      ctx.service.rejoin('b', SOCKET);
+      expect(ctx.sent).toEqual([
+        expect.objectContaining({ to: 'socket:s-new', event: 'matchReady' }),
+      ]);
+    });
+
+    it('sends no snapshot when the catch-up ends the duel', () => {
+      const ctx = setup();
+      // Four expiries: a is down to 1, and on turn
+      vi.advanceTimersByTime((DEADLINE + 1) * 4);
+      ctx.service.drop('a');
+      // The round timer hasn't run yet: rejoin is first
+      vi.setSystemTime(Date.now() + DEADLINE + 5);
+      ctx.service.rejoin('a', SOCKET);
+
+      expect(ctx.last('a', 'finished')).toMatchObject({ outcome: 'loss' });
+      expect(ctx.sent.filter((s) => s.to === 'socket:s-new')).toEqual([]);
+      expect(ctx.rooms.roomOf('a')).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('does nothing for a player in no duel', () => {
+      const ctx = setup();
+      ctx.service.rejoin('z', SOCKET);
+      expect(ctx.sent).toEqual([]);
+    });
+  });
+
+  it('knows who is playing, and stops once the duel ends', () => {
     const ctx = setup();
+    expect(ctx.service.isPlaying('a')).toBe(true);
+    expect(ctx.service.isPlaying('z')).toBe(false);
+    ctx.service.forfeit(user('a'));
+    expect(ctx.service.isPlaying('b')).toBe(false);
+  });
+
+  it('clears the round timer and every window on module destroy', () => {
+    const ctx = setup();
+    ctx.service.drop('b');
     ctx.service.onModuleDestroy();
     vi.advanceTimersByTime(DEADLINE * 3);
-    expect(ctx.sent).toEqual([]);
+    expect(ctx.eventsOf('a')).toEqual(['opponentConnection']);
     expect(vi.getTimerCount()).toBe(0);
   });
 });

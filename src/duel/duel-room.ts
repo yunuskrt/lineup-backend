@@ -33,6 +33,8 @@ export type PlayingRoom = RoomBase & {
   readonly squad: LoadedSquad;
   readonly timed: TimedGame;
   readonly firstRound: RoundTiming;
+  // Each seat's reconnect deadline, while away
+  readonly away: readonly [number | null, number | null];
 };
 
 export type DuelRoom = FiltersRoom | FlippingRoom | PlayingRoom;
@@ -43,4 +45,12 @@ export function seatOf(room: DuelRoom, userId: string): Seat {
 
 export function otherSeat(seat: Seat): Seat {
   return seat === 0 ? 1 : 0;
+}
+
+export function withSeat<T>(
+  pair: readonly [T, T],
+  seat: Seat,
+  value: T,
+): readonly [T, T] {
+  return seat === 0 ? [value, pair[1]] : [pair[0], value];
 }

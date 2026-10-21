@@ -43,6 +43,7 @@ function playing(): PlayingRoom {
     squad: SQUAD,
     timed: step.timed,
     firstRound: start.round!,
+    away: [null, null],
   };
 }
 

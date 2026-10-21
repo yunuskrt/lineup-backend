@@ -43,7 +43,7 @@ This todo file is for developer-side use.
 - [x] **Phase B37 — FIFO Matchmaking**: In-memory queue pairing the first two waiting clients into a room.
 - [x] **Phase B38 — Duel Orchestration**: Filter coin flip, squad resolution and the alternating round loop.
 - [x] **Phase B39 — Duel Events**: Typed emit and ack payloads for every state the duel screen can be in.
-- [ ] **Phase B40 — Disconnect Handling**: 20s reconnect window, running clock, forfeit and result routing.
+- [x] **Phase B40 — Disconnect Handling**: 20s reconnect window, running clock, forfeit and result routing.
 - [ ] **Phase B41 — Duel Persistence**: Write duel sessions, rounds, guesses and results from the gateway.
 - [ ] **Phase B42 — Socket Rate Limiting**: Per-connection guess throttling outside the HTTP pipeline.
 - [ ] **Phase B43 — Duel Integration Harness**: Two simulated clients covering win, loss, draw and forfeit.

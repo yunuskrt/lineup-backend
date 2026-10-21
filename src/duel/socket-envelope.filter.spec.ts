@@ -2,8 +2,10 @@ import { type ArgumentsHost, Logger } from '@nestjs/common';
 import { ApiException, SERVER_ERROR_MESSAGE } from '@/common/api-exception.js';
 import { socketAckSchema } from '@/contract/socket.js';
 import {
+  failureAck,
   handshakeRefusal,
   SocketEnvelopeFilter,
+  SUCCESS_ACK,
   socketError,
 } from '@/duel/socket-envelope.filter.js';
 
@@ -123,5 +125,17 @@ describe('SocketEnvelopeFilter', () => {
     const { host, emit } = hostWith(undefined);
     expect(() => filter.catch(forbidden, host)).not.toThrow();
     expect(emit).toHaveBeenCalledWith('error', forbidden.error);
+  });
+});
+
+describe('socket acks', () => {
+  it('parse with the ack schema, success and failure alike', () => {
+    expect(socketAckSchema.safeParse(SUCCESS_ACK).success).toBe(true);
+    const failure = failureAck({
+      code: 'forbidden',
+      message: 'Wait for your turn.',
+      retryAfterMs: null,
+    });
+    expect(socketAckSchema.safeParse(failure).success).toBe(true);
   });
 });

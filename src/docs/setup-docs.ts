@@ -11,7 +11,7 @@ import {
   BEARER_SCHEME,
   SESSION_SCHEME,
 } from '@/auth/session-docs.decorator.js';
-import { contractComponents } from '@/contract/openapi.js';
+import { contractComponents, socketDoc } from '@/contract/openapi.js';
 import { PROTOCOL_VERSION } from '@/contract/protocol.js';
 
 type ComponentSchemas = NonNullable<
@@ -54,7 +54,10 @@ export function setupDocs(app: INestApplication): void {
     },
   };
 
-  SwaggerModule.setup('docs', app, document, {
+  // OpenAPI has no sockets: an extension
+  const published = { ...document, 'x-socket': socketDoc() };
+
+  SwaggerModule.setup('docs', app, published, {
     jsonDocumentUrl: 'docs/openapi.json',
     raw: ['json'],
   });

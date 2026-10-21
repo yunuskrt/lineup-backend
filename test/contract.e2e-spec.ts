@@ -250,6 +250,29 @@ describe('Contract delivery (e2e)', () => {
       });
     });
 
+    it('publishes the socket contract as x-socket', async () => {
+      const res = await get('/docs/openapi.json').expect(200);
+      const socket = res.body['x-socket'];
+      const schemas = res.body.components.schemas;
+
+      expect(Object.keys(socket.commands)).toHaveLength(5);
+      expect(Object.keys(socket.events)).toHaveLength(15);
+      expect(socket.commands['duel:guess']).toEqual({
+        payload: { $ref: '#/components/schemas/DuelGuessRequest' },
+        ack: { $ref: '#/components/schemas/EmptyResult' },
+        refusals: expect.arrayContaining(['session_over', 'rate_limited']),
+      });
+      expect(socket.commands['queue:enter'].payload).toBeNull();
+      expect(socket.events.finished).toEqual({
+        $ref: '#/components/schemas/DuelResult',
+      });
+
+      const refs = JSON.stringify(socket).match(/#\/components\/schemas\/\w+/g);
+      for (const ref of new Set(refs)) {
+        expect(schemas).toHaveProperty(ref.split('/').pop() as string);
+      }
+    });
+
     it('serves the Swagger UI', async () => {
       const res = await get('/docs').redirects(1).expect(200);
       expect(res.text).toContain('swagger-ui');

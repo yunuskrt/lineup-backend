@@ -48,3 +48,4 @@ Not Started
 - B37 FIFO Matchmaking: queue:enter/leave, in-memory rooms, 60s timeout
 - B38a Filters & Coin Flip: submit + pool check, 30s window, 2s reveal
 - B38b Duel Round Loop: guess/forfeit, timer per duel, events to finished
+- B39 Duel Events: typed socket maps, fail-closed emits, x-socket catalogue

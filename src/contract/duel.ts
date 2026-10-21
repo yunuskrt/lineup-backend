@@ -6,7 +6,7 @@ import {
   livesSchema,
 } from '@/contract/common.js';
 import { SQUAD_SIZE } from '@/contract/constants.js';
-import { apiErrorSchema } from '@/contract/envelope.js';
+import { type ApiErrorCode, apiErrorSchema } from '@/contract/envelope.js';
 import {
   filtersSchema,
   matchIdentitySchema,
@@ -139,7 +139,7 @@ export const duelGuessRequestSchema = z
   .register(contractRegistry, { id: 'DuelGuessRequest' });
 export type DuelGuessRequest = z.infer<typeof duelGuessRequestSchema>;
 
-// Event names are provisional until B39
+// Final since B39: W30's client speaks these
 export const duelCommandSchemas = {
   'queue:enter': z.undefined(),
   'queue:leave': z.undefined(),
@@ -148,6 +148,29 @@ export const duelCommandSchemas = {
   'duel:forfeit': z.undefined(),
 } as const;
 export type DuelCommand = keyof typeof duelCommandSchemas;
+
+type ServerErrorCode = Exclude<ApiErrorCode, 'network'>;
+
+// What each command's ack may carry
+export const DUEL_COMMAND_REFUSALS = {
+  'queue:enter': ['forbidden', 'invalid_input', 'server_error'],
+  'queue:leave': ['forbidden', 'invalid_input', 'server_error'],
+  'filters:submit': [
+    'forbidden',
+    'invalid_input',
+    'empty_pool',
+    'server_error',
+  ],
+  'duel:guess': [
+    'invalid_input',
+    'session_over',
+    'forbidden',
+    // Sent from B42; the web handles it already
+    'rate_limited',
+    'server_error',
+  ],
+  'duel:forfeit': ['forbidden', 'invalid_input', 'server_error'],
+} as const satisfies Record<DuelCommand, readonly ServerErrorCode[]>;
 
 export const duelEventSchemas = {
   queued: queueStateSchema,

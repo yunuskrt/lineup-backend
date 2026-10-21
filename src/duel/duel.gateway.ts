@@ -24,7 +24,11 @@ import {
   duelGuessRequestSchema,
 } from '@/contract/duel.js';
 import { type Filters, filtersSchema } from '@/contract/match.js';
-import type { SocketAck } from '@/contract/socket.js';
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+  SocketAck,
+} from '@/contract/socket.js';
 import { ConnectionRegistry } from '@/duel/connection-registry.js';
 import { DuelNotifier, roomOf } from '@/duel/duel-notifier.js';
 import { DuelPlayService } from '@/duel/duel-play.service.js';
@@ -41,9 +45,10 @@ import {
 
 // Set by the handshake, from the server only
 export type SocketData = { user: User };
-type Events = DefaultEventsMap;
-export type DuelSocket = Socket<Events, Events, Events, SocketData>;
-export type DuelServer = Server<Events, Events, Events, SocketData>;
+type Listen = ClientToServerEvents;
+type Emit = ServerToClientEvents;
+export type DuelSocket = Socket<Listen, Emit, DefaultEventsMap, SocketData>;
+export type DuelServer = Server<Listen, Emit, DefaultEventsMap, SocketData>;
 
 export const REPLACED = "You're connected somewhere else.";
 export const UNKNOWN_COMMAND = 'Unknown command.';
@@ -92,7 +97,8 @@ export class DuelGateway
     if (replaced) {
       // The new socket starts idle
       this.matchmaking.drop(user.id);
-      replaced.emit('error', new ApiException('forbidden', REPLACED).error);
+      const error = new ApiException('forbidden', REPLACED).error;
+      this.notifier.toSocket(replaced, 'error', error);
       replaced.disconnect(true);
     }
   }

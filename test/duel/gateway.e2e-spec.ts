@@ -25,6 +25,7 @@ import {
   nextEvent,
   openSocket,
   type Refusal,
+  recordEvents,
   refusalOf,
 } from '@test/duel/socket-client.js';
 
@@ -262,12 +263,12 @@ describe('Duel gateway (e2e)', () => {
       const replacedBy = nextEvent(first.socket, 'error');
       const closed = nextEvent<string>(first.socket, 'disconnect');
 
-      const second = await connected(
-        open({
-          token: await tokenFor(first.cookie),
-          protocolVersion: PROTOCOL_VERSION,
-        }),
-      );
+      const opened = open({
+        token: await tokenFor(first.cookie),
+        protocolVersion: PROTOCOL_VERSION,
+      });
+      const heard = recordEvents(opened);
+      const second = await connected(opened);
 
       expect(apiErrorSchema.parse(await replacedBy)).toEqual({
         code: 'forbidden',
@@ -279,6 +280,8 @@ describe('Duel gateway (e2e)', () => {
       expect(await ack(second, 'duel:forfeit')).toEqual(
         failure('forbidden', DUEL_PLAY_MESSAGES.noDuel),
       );
+      // The takeover notice is for the old socket only
+      expect(heard).toEqual([]);
     });
 
     it('leaves another user connected', async () => {

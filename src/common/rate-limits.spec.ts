@@ -7,8 +7,11 @@ import {
   ACCOUNT_LIMIT,
   accountTracker,
   RATE_LIMITS,
+  SOCKET_LIMITS,
+  socketLimitOf,
   THROTTLER_OPTIONS,
 } from '@/common/rate-limits.js';
+import { duelCommandSchemas } from '@/contract/duel.js';
 import { SoloController } from '@/solo/solo.controller.js';
 
 // The throttler's own metadata keys
@@ -107,4 +110,40 @@ describe('the per-account limit', () => {
   it('leaves the response headers to the guard', () => {
     expect(THROTTLER_OPTIONS).toMatchObject({ setHeaders: false });
   });
+});
+
+describe('SOCKET_LIMITS', () => {
+  it('has a positive whole limit and a window of a second or more', () => {
+    for (const { limit, ttl } of Object.values(SOCKET_LIMITS)) {
+      expect(Number.isInteger(limit) && limit > 0).toBe(true);
+      expect(ttl).toBeGreaterThanOrEqual(1_000);
+    }
+  });
+
+  it('limits duel guesses as REST does: 12 per 3 s', () => {
+    expect(SOCKET_LIMITS['duel:guess']).toEqual({ limit: 12, ttl: 3_000 });
+  });
+
+  it('names only duel commands, beside the default', () => {
+    const commands = Object.keys(duelCommandSchemas);
+    for (const name of Object.keys(SOCKET_LIMITS)) {
+      if (name !== 'default') expect(commands).toContain(name);
+    }
+  });
+
+  it.each([
+    ['queue:enter', SOCKET_LIMITS['queue:enter']],
+    ['filters:submit', SOCKET_LIMITS['filters:submit']],
+    ['queue:leave', SOCKET_LIMITS.default],
+    ['duel:forfeit', SOCKET_LIMITS.default],
+  ])('gives %s its limit', (command, expected) => {
+    expect(socketLimitOf(command)).toEqual(expected);
+  });
+
+  it.each(['default', 'toString', '__proto__'])(
+    'reads %s as a plain command on the default',
+    (command) => {
+      expect(socketLimitOf(command)).toBe(SOCKET_LIMITS.default);
+    },
+  );
 });

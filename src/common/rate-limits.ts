@@ -5,6 +5,7 @@ import {
   Throttle,
   type ThrottlerModuleOptions,
 } from '@nestjs/throttler';
+import type { DuelCommand } from '@/contract/duel.js';
 
 const SECOND = 1_000;
 const MINUTE = 60 * SECOND;
@@ -23,6 +24,20 @@ export const RATE_LIMITS = {
   token: { limit: 30, ttl: MINUTE },
   catalog: { limit: 60, ttl: MINUTE },
 } as const satisfies Record<string, Limit>;
+
+// Per user and command; the rest share default
+export const SOCKET_LIMITS = {
+  default: { limit: 120, ttl: MINUTE },
+  'duel:guess': RATE_LIMITS.guess,
+  'queue:enter': { limit: 10, ttl: MINUTE },
+  'filters:submit': { limit: 10, ttl: MINUTE },
+} as const satisfies { default: Limit } & Partial<Record<DuelCommand, Limit>>;
+
+export function socketLimitOf(command: string): Limit {
+  return Object.hasOwn(SOCKET_LIMITS, command) && command !== 'default'
+    ? SOCKET_LIMITS[command as keyof typeof SOCKET_LIMITS]
+    : SOCKET_LIMITS.default;
+}
 
 // Per email, beside sign-in's per-IP limit
 export const ACCOUNT_LIMIT: Limit = { limit: 5, ttl: 15 * MINUTE };

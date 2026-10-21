@@ -44,6 +44,12 @@ describe('socketCatalog', () => {
     }
   });
 
+  it('lets every command be rate limited', () => {
+    for (const { refusals } of Object.values(catalog.commands)) {
+      expect(refusals).toContain('rate_limited');
+    }
+  });
+
   it('carries the refusals each command can send', () => {
     expect(catalog.commands['filters:submit'].refusals).toContain('empty_pool');
     expect(catalog.commands['duel:guess'].refusals).toEqual(

@@ -1,4 +1,4 @@
-import { Logger, UseFilters } from '@nestjs/common';
+import { Logger, UseFilters, UseGuards } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -35,6 +35,7 @@ import { DuelPlayService } from '@/duel/duel-play.service.js';
 import { DuelStartService } from '@/duel/duel-start.service.js';
 import { MatchmakingService } from '@/duel/matchmaking.service.js';
 import { SocketAuthService } from '@/duel/socket-auth.service.js';
+import { SocketRateLimitGuard } from '@/duel/socket-rate-limit.guard.js';
 import {
   failureAck,
   handshakeRefusal,
@@ -61,6 +62,7 @@ function parseCommand(command: DuelCommand, payload: unknown): void {
 
 @WebSocketGateway()
 @UseFilters(SocketEnvelopeFilter)
+@UseGuards(SocketRateLimitGuard)
 export class DuelGateway
   implements
     OnGatewayInit<DuelServer>,

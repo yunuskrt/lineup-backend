@@ -26,6 +26,7 @@ import {
   QUEUE_TIMEOUT_MS,
 } from '@/duel/matchmaking.service.js';
 import { SocketAuthService } from '@/duel/socket-auth.service.js';
+import { SocketRateLimitGuard } from '@/duel/socket-rate-limit.guard.js';
 import { MatchesModule } from '@/matches/matches.module.js';
 
 @Module({
@@ -33,6 +34,7 @@ import { MatchesModule } from '@/matches/matches.module.js';
   providers: [
     DuelGateway,
     SocketAuthService,
+    SocketRateLimitGuard,
     ConnectionRegistry,
     DuelNotifier,
     DuelRooms,

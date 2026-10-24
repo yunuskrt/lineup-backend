@@ -1,26 +1,30 @@
 # Coding Standards — Shared
 
-Applies to **all three repositories**. Each repo also carries exactly one stack file:
+Applies to **all four repositories**. Each repo also carries exactly one stack file:
 
-| Repo             | Stack             | Also read                     |
-| ---------------- | ----------------- | ----------------------------- |
-| `lineup-backend` | NestJS            | `coding-standards-backend.md` |
-| `lineup-web`     | Next.js           | `coding-standards-web.md`     |
-| `lineup-mobile`  | Expo React Native | `coding-standards-mobile.md`  |
+| Repo             | Stack               | Also read                     |
+| ---------------- | ------------------- | ----------------------------- |
+| `lineup-backend` | NestJS              | `coding-standards-backend.md` |
+| `lineup-web`     | Next.js             | `coding-standards-web.md`     |
+| `lineup-mobile`  | Expo React Native   | `coding-standards-mobile.md`  |
+| `lineup-scraper` | Python + TypeScript | `coding-standards-scraper.md` |
 
 Rules live in exactly one file. If something here contradicts a stack file, the stack file wins for that repo.
 
 ## Repository Boundaries
 
-Three repos, each app-scoped and independently deployable:
+Three app repos, each app-scoped and independently deployable, plus one offline tooling repo:
 
 ```text
-lineup-backend    NestJS — REST, auth, Socket.IO, Prisma, rules engine, ingestion
+lineup-backend    NestJS — REST, auth, Socket.IO, Prisma schema, rules engine
 lineup-web        Next.js — renders and transmits input
 lineup-mobile     Expo — renders and transmits input
+lineup-scraper    Offline ETL — extracts, transforms, loads data and images; never deployed
 ```
 
-- **No repo depends on another repo.** No shared package, no submodule, no cross-repo import. Each repo defines its own validations, components, types, tokens and helpers, and a repo must build and run with the other two deleted.
+- **No repo depends on another repo.** No shared package, no submodule, no cross-repo import. Each repo defines its own validations, components, types, tokens and helpers, and a repo must build and run with the others deleted.
+- **The backend owns the database schema.** The scraper keeps a copy of `schema.prisma` to write the content tables, and never runs a migration.
+- **One named exception to "rules engine in one place":** the scraper holds a copy of `normalizeName` to fill `player_aliases.normalized`. That is data preparation, as in the backend seed, not game logic. Its output must equal the backend's, and a backend check enforces it.
 - **The backend has no knowledge of its clients.** No branching on platform, no web-specific endpoint, no mobile-specific payload. If an endpoint only makes sense for one client, the design is wrong.
 - **Neither client contains game logic.** No timer arithmetic that decides anything, no lives accounting, no answer validation, no turn order. Clients render what the backend sends. A countdown rendered from a server timestamp is presentation; a countdown that decides a life was lost is a bug.
 
@@ -102,7 +106,7 @@ A contract change is therefore three pieces of work in sequence: change the back
 
 - Unit tests cover **services, utilities and the rules engine** — not components or pages.
 - The backend `game` module is **mandatory** coverage: timer, lives, turn passing, round resolution, alias matching. It is pure, so it needs no mocks.
-- Colocate tests as `*.spec.ts` (backend) or `*.test.ts` (clients) next to the code under test.
+- Colocate tests as `*.spec.ts` (backend and scraper TypeScript) or `*.test.ts` (clients) next to the code under test. Scraper Python tests are `test_*.py`.
 - Unit tests run in Node with no network and no database access.
 - Integration and E2E suites **are** allowed network and database access, run as separate commands, and never against production data. A disposable Neon branch only.
 

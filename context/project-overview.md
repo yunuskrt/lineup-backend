@@ -119,11 +119,11 @@ This is the constraint that shapes the entire architecture: browser, iOS and And
 - Clients render and transmit input. The server owns the squad, the timer, the lives, the turn order and every answer validation.
 - The squad is never sent to the client — not even partially, not even encrypted. Only revealed players are pushed, as they're revealed.
 - **Protocol versioning.** Web deploys instantly; mobile users sit on old binaries for weeks. Every socket handshake carries a `protocolVersion`; the server supports N and N-1 and refuses older builds with an upgrade prompt rather than desyncing.
-- **The rules engine exists in exactly one place: the backend's `game` module.** Neither client carries a copy, so there is nothing to drift. Three repos make this easier to hold than a monorepo did — the clients have no import path to game logic even if someone reaches for one.
+- **The rules engine exists in exactly one place: the backend's `game` module.** Neither client carries a copy, so there is nothing to drift. Separate repos make this easier to hold than a monorepo did — the clients have no import path to game logic even if someone reaches for one.
 - **Both clients speak the same two protocols**: REST for solo, profile and auth; Socket.IO for duels. A browser player and an Expo player are indistinguishable to the backend, which is what puts them in one matchmaking pool.
 - Server-side rate limiting on guesses to blunt dictionary-spam bots — on the HTTP path and the socket path alike, since the duel guess never touches HTTP.
 - **The web client is cross-origin with the API**, which the earlier single-app design hid. Cookies must survive that: host the API and the web app on one parent domain (`api.lineup.gg` / `app.lineup.gg`) and scope the session cookie to it, rather than relying on `SameSite=None` third-party cookies that Safari and Chrome increasingly refuse. Mobile sidesteps this entirely with a bearer token.
-- **No code is shared between the three repos.** Each owns its validations, components, types and tokens outright and builds with the other two deleted. What they agree on is the backend's API contract — defined by the backend, documented via OpenAPI, transcribed by hand into each client. Keeping those transcriptions in step is manual work, and `PROTOCOL_VERSION` is what turns a missed one into a refused connection instead of a broken duel.
+- **No code is shared between the four repos.** Each owns its validations, components, types and tokens outright and builds with the others deleted. What the apps agree on is the backend's API contract — defined by the backend, documented via OpenAPI, transcribed by hand into each client. Keeping those transcriptions in step is manual work, and `PROTOCOL_VERSION` is what turns a missed one into a refused connection instead of a broken duel. The scraper keeps its own copy of the database schema; the backend owns it.
 
 ---
 
@@ -132,13 +132,13 @@ This is the constraint that shapes the entire architecture: browser, iOS and And
 **PostgreSQL (Neon) is the system of record.** Redis holds only ephemeral realtime state. External providers are used for **one-time, offline ingestion** — the app never calls a third-party football API during gameplay.
 
 ```text
-Providers (API + open data + curation)
-   → Normalize & entity-resolve (clubs, players, aliases)
-   → Score memorability
-   → Guessability gate + manual QA
-   → Postgres (Neon)  +  Bucket (images)
-   → NestJS backend — REST + Socket.IO + auth + rules engine
-   → Browser (Next.js) / iOS / Android (Expo)
+lineup-scraper   Providers (API + open data + scraping + curation)
+                    → Normalize & entity-resolve (clubs, players, aliases)
+                    → Score memorability
+                    → Guessability gate + manual QA
+                    → Postgres (Neon)  +  Bucket (images)
+lineup-backend      → NestJS backend — REST + Socket.IO + auth + rules engine
+clients             → Browser (Next.js) / iOS / Android (Expo)
 ```
 
 **Persistent (Postgres):** competitions, seasons, clubs, club_aliases, matches, match_teams, match_events, players, player_aliases, lineups, memorability_scores, users, guest_identities, game_sessions, game_rounds, guesses, stats.
@@ -169,10 +169,11 @@ The naive approach — ingest 26 seasons × 24 clubs × ~50 matches — is rough
 | **StatsBomb Open Data**                     | Free, event-level, limited competitions — excellent for validation and World Cup / Euro spot-filling                                                                                     |
 | **Wikipedia / Wikidata**                    | Cultural-footprint signal (article existence, pageviews, named matches) **and** starting XIs for famous fixtures, which are near-universally documented. CC BY-SA — attribution required |
 | **openfootball / football.db**              | Free fixture and result skeleton for the full 2000→2026 range                                                                                                                            |
+| **Mackolik** (mackolik.com)                 | **Candidate**, pending the scraper's source trial (S02): terms of use, `robots.txt`, and lineup coverage across the season range                                                         |
 | **Transfermarkt, FBref, worldfootball.net** | Manual spot-checking only — never scraped programmatically (ToS)                                                                                                                         |
 | **LLMs**                                    | **Not a data source.** Never the origin of a lineup, score, date, or player name                                                                                                         |
 
-> ⚠️ **Known risk:** lineup coverage for **2000–2010** is the hardest part of this project and should be validated with a real provider trial before committing to the full season range. If it proves unworkable, the honest fallback is to launch at 2008–09 onward and backfill the 2000s as a curated "Classics" pack.
+> ⚠️ **Known risk:** lineup coverage for **2000–2010** is the hardest part of this project and should be validated with a real provider trial (the scraper's S02) before committing to the full season range. If it proves unworkable, the honest fallback is to launch at 2008–09 onward and backfill the 2000s as a curated "Classics" pack.
 
 ---
 
@@ -180,11 +181,11 @@ The naive approach — ingest 26 seasons × 24 clubs × ~50 matches — is rough
 
 | Category               | Choice                                                                                                                                                                                                                                                                       |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Repo                   | **Three separate repositories** — `lineup-backend`, `lineup-web`, `lineup-mobile`. Each is app-scoped and deploys independently                                                                                                                                              |
-| Framework (backend)    | **NestJS** — modules, DI and a first-class Socket.IO gateway in one long-running process. Owns the API, auth, the rules engine, the database and ingestion                                                                                                                   |
+| Repo                   | **Four separate repositories** — `lineup-backend`, `lineup-web`, `lineup-mobile` and `lineup-scraper`. The three apps are app-scoped and deploy independently; the scraper is offline tooling that is never deployed                                                          |
+| Framework (backend)    | **NestJS** — modules, DI and a first-class Socket.IO gateway in one long-running process. Owns the API, auth, the rules engine and the database schema                                                                                                                       |
 | Framework (web)        | **Next.js (App Router) + React** — a pure client of the backend. No database access, no game logic. RSC still suits the marketing surfaces                                                                                                                                   |
 | Framework (mobile)     | **Expo (React Native) + Expo Router** — file-based routing that mirrors Next, one TypeScript codebase for iOS and Android, EAS Build/Submit for store delivery. Not a webview wrapper                                                                                        |
-| Language               | **TypeScript**, strict, in all three repos                                                                                                                                                                                                                                   |
+| Language               | **TypeScript**, strict, in every repo. The scraper also uses **Python** for extraction only                                                                                                                                                                                  |
 | Realtime               | **Socket.IO** — your instinct is right. Rooms, ack callbacks, buffered reconnection and HTTP long-poll fallback come free; `socket.io-client` works unmodified in React Native. Raw `ws` means rebuilding all of it                                                          |
 | Realtime host          | **The NestJS backend itself**, via `@nestjs/websockets` + `@nestjs/platform-socket.io`. One long-running process serves REST and sockets. Vercel cannot hold persistent WebSocket connections, which is why the backend is not on Vercel                                     |
 | Object storage         | **A bucket with a free tier** (Cloudflare R2, Supabase Storage or Backblaze B2 — decided later) for player images and club crests. Postgres stores the object key, never the binary. Uploaded during ingestion, served to clients directly from CDN                          |
@@ -194,13 +195,13 @@ The naive approach — ingest 26 seasons × 24 clubs × ~50 matches — is rough
 | Auth                   | **Better Auth**, mounted in NestJS via `@thallesp/nestjs-better-auth` — TypeScript-native, runs on your own Postgres, first-class Expo support, an anonymous/guest plugin with account linking, and a JWT plugin the socket gateway validates. Requires `bodyParser: false`  |
 | State (client)         | **Zustand** for the live session store + **TanStack Query** for server data. Unlike a turn-free single-player app, realtime events fan out to many components here — a store is justified. Both work identically in React Native                                             |
 | Validation / contracts | **Zod**, defined separately in each repo. No shared package — the backend owns the contract and documents it with **OpenAPI** (`@nestjs/swagger`); each client holds its own transcription of the payload shapes                                                             |
-| Data ingestion         | One-time, rerunnable, **idempotent** TypeScript scripts in the backend repo under `scripts/ingest`. Never a runtime dependency                                                                                                                                               |
+| Data ingestion         | The separate **`lineup-scraper`** repo: Python extracts (Scrapy), TypeScript transforms, validates and loads the content tables and images. Rerunnable and **idempotent**. Never a runtime dependency                                                                       |
 | Styling/CSS (web)      | **Tailwind + shadcn/ui** — unstyled Radix primitives, lives in-repo, no fight with a themed library for a custom look                                                                                                                                                        |
 | Styling (mobile)       | **NativeWind** + a design-token file local to the repo, transcribed from `theme.md`. Port tokens and logic across platforms by hand, **never components** — attempting one component tree for web and native is a well-known way to get an app that feels wrong on all three |
 | UI components          | shadcn/ui for scaffolding (dialogs, tabs, sliders, toasts); bespoke for the signature pieces — the pitch/formation view, the countdown ring, the lives display, the reveal cards                                                                                             |
 | Motion/transitions     | **Framer Motion** (web) / **Reanimated** (mobile) — same design intent, native-appropriate runtimes. The countdown and reveal animations carry most of the game's tension                                                                                                    |
 | Testing                | **Jest or Vitest** on the backend `game` module (timer, lives, turn passing, alias matching — these must be tested), **Playwright** for web flows, plus a two-simulated-client socket harness for duel integration                                                           |
-| Observability          | Sentry on all three repos; structured logging + health checks on the backend                                                                                                                                                                                                 |
+| Observability          | Sentry on the three app repos; structured logging + health checks on the backend                                                                                                                                                                                             |
 | Deployment             | **Railway, Fly.io or Render** (NestJS — needs a persistent process and sticky sessions if scaled) · **Vercel** (Next.js) · **Neon** (DB) · **Upstash** (Redis) · **EAS** (App Store + Play Store)                                                                            |
 
 ---
@@ -248,7 +249,7 @@ Expo Router mirrors these paths on mobile so deep links and analytics events are
 11. Rounds are exactly **15 seconds**, server-timed, with a fixed latency grace window applied equally to all platforms.
 12. **Guest play requires no signup**, and upgrading a guest to an account never destroys history.
 13. A match enters the pool only if it passes **both** the memorability threshold and the guessability gate.
-14. Avoid unnecessary infrastructure — no Kubernetes, no microservices, no message broker. **One backend**, two clients, a database and a bucket. The backend stays a single NestJS service; REST and sockets are modules within it, never separate deployables.
+14. Avoid unnecessary infrastructure — no Kubernetes, no microservices, no message broker. **One backend**, two clients, a database and a bucket, plus one offline scraper repo that is never deployed and serves no traffic. The backend stays a single NestJS service; REST and sockets are modules within it, never separate deployables.
 15. **Nothing purchasable may affect a duel.** No bought lives, hints, time extensions, easier opponents or restricted match pools. Two players in a duel face identical rules regardless of tier.
 16. **Pro status is resolved server-side and is platform-agnostic** — bought on any platform, honoured on all of them. The client never asserts its own tier.
 17. **The answerable squad is the starting XI — exactly 11 players.** Substitutes are never answers, never revealed, never scored.
@@ -278,7 +279,7 @@ Previously open; now settled, and the spec above reflects them.
 
 - **Specification stage.** No code written.
 - **Immediate next step is not scaffolding — it's data validation.** Trial an API-Football / Sportmonks tier and confirm real lineup coverage for a 20-match sample spread across 2001, 2006, 2011 and 2019. The answer determines whether the season range in this document is honest.
-- Build order is **web → backend → mobile**, in three repositories.
+- Build order is **web → backend → mobile**. The scraper repo starts once duel gameplay is proven on mock data (backend B43).
 - **The web app is built first and in full against a mock API adapter**, before the backend exists. Layout, the countdown ring and the reveal are the parts most likely to be wrong, and they are cheapest to fix while nothing is wired to them.
 - This only works because the web client is written against an **API client interface** from its first commit, with a mock implementation behind it. Going live is swapping the implementation, not rewriting screens. A web app that reaches into mock fixtures directly cannot be wired up later without being taken apart.
 - Two browser players duelling each other is the milestone that proves the backend; mobile then joins the same pool by speaking the same two protocols, with no backend change.

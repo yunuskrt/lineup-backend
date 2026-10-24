@@ -19,6 +19,7 @@ This is the common workflow that we will use for every single feature/fix:
    - **web** — click it in the browser
    - **backend** — call it with an HTTP client, or drive the socket with the two-client harness
    - **mobile** — run it on a simulator, and on a real mid-range Android before shipping
+   - **scraper** — run the stage on a small cached sample and read its output; load into a disposable Neon branch, then rerun and expect 0 changes
 5. **Iterate** - Iterate and change things if needed
 6. **Commit** - Only after build passes and everything works
 7. **Merge** - Merge to main
@@ -46,12 +47,13 @@ Do not rewrite the original goals to match what happened. The goal stays as writ
 
 ## Working Across Repos
 
-Three repos means a change can land in one and break another. Rules:
+Four repos means a change can land in one and break another. Rules:
 
 - **One feature, one repo.** If a feature needs work in two repos, it is two features with the backend one first. A branch never spans repositories.
 - **The backend ships first, always.** Its API is additive until the clients catch up — never remove or rename a field a released client still reads.
 - **A contract change is three separate tasks**, in order: backend, then web, then mobile. Nothing propagates automatically — there is no shared package, so a payload shape changed in one repo is still wrong in the other two until you go and change it there.
 - **Breaking socket payloads bump `PROTOCOL_VERSION` in every repo.** The backend accepts N and N-1, which is what buys mobile users time to update, and what turns a drift into a refused connection instead of a broken duel.
+- **A schema change the scraper needs is a backend phase first:** write the migration and deploy it to every Neon branch. Only then does the scraper copy `schema.prisma`. The scraper never runs `prisma migrate`.
 - **When a client misbehaves, suspect the client's copy of the contract first.** Duplicated schemas are the most likely failure in this architecture, and the symptom is usually a parse error or a silently missing field.
 - Say which repo you are in before making changes when it is not obvious from context.
 

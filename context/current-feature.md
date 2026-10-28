@@ -53,3 +53,4 @@ Not Started
 - B41 Duel Persistence: one-tx duel save after finished, W/L/D, 60s retry
 - B42 Socket Rate Limiting: per-user limit on every command, 12/3s guesses
 - B43 Duel Integration Harness: DuelHarness, 4 whole games, 5 suites moved
+- R1 Transfermarkt Ids: nullable unique tm id on clubs, players, matches

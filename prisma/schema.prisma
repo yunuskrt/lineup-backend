@@ -58,15 +58,17 @@ model Season {
 }
 
 model Club {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  slug      String   @unique
-  kind      ClubKind
-  name      String
-  shortName String   @map("short_name")
+  id              String   @id @default(uuid(7)) @db.Uuid
+  slug            String   @unique
+  kind            ClubKind
+  name            String
+  shortName       String   @map("short_name")
   // Bucket object key, never a URL (B23)
-  crestKey  String?  @map("crest_key")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  crestKey        String?  @map("crest_key")
+  // Source page id; never sent to a client
+  transfermarktId String?  @unique @map("transfermarkt_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   aliases    ClubAlias[]
   matchTeams MatchTeam[]
@@ -89,14 +91,16 @@ model ClubAlias {
 }
 
 model Player {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  slug      String   @unique
+  id              String   @id @default(uuid(7)) @db.Uuid
+  slug            String   @unique
   // Display form, diacritics kept
-  name      String
+  name            String
   // Bucket object key, never a URL (B23)
-  imageKey  String?  @map("image_key")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  imageKey        String?  @map("image_key")
+  // Source page id; never sent to a client
+  transfermarktId String?  @unique @map("transfermarkt_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   aliases     PlayerAlias[]
   lineups     Lineup[]
@@ -149,18 +153,20 @@ enum MatchEventKind {
 }
 
 model Match {
-  id           String   @id @default(uuid(7)) @db.Uuid
-  slug         String   @unique
-  seasonId     String   @map("season_id") @db.Uuid
-  date         DateTime @db.Date
+  id              String   @id @default(uuid(7)) @db.Uuid
+  slug            String   @unique
+  seasonId        String   @map("season_id") @db.Uuid
+  date            DateTime @db.Date
   // Display text only: `Final`, `Matchday 34`
-  stage        String?
-  nickname     String?
-  extraTime    Boolean  @default(false) @map("extra_time")
-  shootoutHome Int?     @map("shootout_home")
-  shootoutAway Int?     @map("shootout_away")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  stage           String?
+  nickname        String?
+  extraTime       Boolean  @default(false) @map("extra_time")
+  shootoutHome    Int?     @map("shootout_home")
+  shootoutAway    Int?     @map("shootout_away")
+  // Source page id; never sent to a client
+  transfermarktId String?  @unique @map("transfermarkt_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   season       Season             @relation(fields: [seasonId], references: [id], onDelete: Restrict)
   teams        MatchTeam[]

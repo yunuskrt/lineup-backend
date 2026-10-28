@@ -13,7 +13,9 @@
       "Bash(npm view *)",
       "Bash(grep -v -i 'sslmode\\\\|libpq\\\\|trace-warn\\\\|To prepare\\\\|^$')",
       "mcp__neon__describe_project",
-      "mcp__neon__list_branches"
+      "mcp__neon__list_branches",
+      "mcp__neon__get_database_tables",
+      "mcp__neon__list_branch_computes"
     ]
   }
 }

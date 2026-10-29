@@ -1,4 +1,5 @@
 import { ApiException } from '@/common/api-exception.js';
+import type { Env } from '@/config/env.schema.js';
 import { historyPageSchema } from '@/contract/profile.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
 import { BAD_CURSOR, HistoryService } from '@/users/history.service.js';
@@ -59,7 +60,10 @@ describe('HistoryService', () => {
     gameParticipant: { findMany: vi.fn(), findFirst: vi.fn() },
     gameRound: { findMany: vi.fn() },
   };
-  const service = new HistoryService(prisma as unknown as PrismaService);
+  const service = new HistoryService(
+    prisma as unknown as PrismaService,
+    {} as Env,
+  );
 
   beforeEach(() => {
     vi.resetAllMocks();

@@ -1,3 +1,4 @@
+import type { Env } from '@/config/env.schema.js';
 import type { PositionGroup } from '@/contract/common.js';
 import { SquadLoaderService } from '@/matches/squad-loader.service.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
@@ -23,6 +24,7 @@ const lineup = (slot: number) => ({
   player: {
     id: `p-${slot}`,
     name: `Secret Name ${slot}`,
+    imageKey: `players/p-${slot}/0123456789ab.webp`,
     aliases: [
       { normalized: `secret name ${slot}` },
       { normalized: `n${slot}` },
@@ -37,10 +39,15 @@ const team = (overrides: object = {}) => ({
   ...overrides,
 });
 
-function loaderWith(row: unknown) {
+const BASE = 'https://bucket.example.com/images';
+
+function loaderWith(row: unknown, assetBase?: string) {
   const findUnique = vi.fn().mockResolvedValue(row);
   const prisma = { matchTeam: { findUnique } };
-  const loader = new SquadLoaderService(prisma as unknown as PrismaService);
+  const loader = new SquadLoaderService(
+    prisma as unknown as PrismaService,
+    { ASSET_BASE_URL: assetBase } as Env,
+  );
   return { findUnique, loader };
 }
 
@@ -79,6 +86,20 @@ describe('SquadLoaderService', () => {
       position: 'GK',
       imageUrl: null,
     });
+  });
+
+  it('sends no photo URL without a base', async () => {
+    const squad = await loaderWith(team()).loader.load('m-1', 'home');
+    expect(squad.players.map((player) => player.imageUrl)).toEqual(
+      Array(11).fill(null),
+    );
+  });
+
+  it('sends a photo as a full URL under the base', async () => {
+    const squad = await loaderWith(team(), BASE).loader.load('m-1', 'home');
+    expect(squad.players[4].imageUrl).toBe(
+      `${BASE}/players/p-4/0123456789ab.webp`,
+    );
   });
 
   it.each([

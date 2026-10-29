@@ -50,6 +50,11 @@ export const envSchema = z
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
     // Off only for e2e suites not about limits
     RATE_LIMITS_ENABLED: z.stringbool().default(true),
+    // Unset: every crest and photo URL stays null
+    ASSET_BASE_URL: z
+      .url({ protocol: /^https$/ })
+      .transform((url) => url.replace(/\/+$/, ''))
+      .optional(),
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.RESEND_API_KEY, {
     path: ['RESEND_API_KEY'],

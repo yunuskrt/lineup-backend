@@ -1,10 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ENV } from '@/config/config.module.js';
+import type { Env } from '@/config/env.schema.js';
 import type { Side } from '@/contract/common.js';
 import { SQUAD_SIZE } from '@/contract/constants.js';
 import type { RevealedPlayer } from '@/contract/player.js';
 import { positionForSlot } from '@/game/formation.js';
 import type { SquadEntry } from '@/game/matcher.js';
 import type { Prisma } from '@/generated/prisma/client.js';
+import { assetUrl } from '@/matches/asset-url.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 
 // Server-only: the answer key (HC 2)
@@ -24,6 +27,7 @@ const SQUAD_SELECT = {
         select: {
           id: true,
           name: true,
+          imageKey: true,
           aliases: { select: { normalized: true } },
         },
       },
@@ -43,6 +47,7 @@ function toLoadedSquad(
   matchId: string,
   side: Side,
   team: TeamRow | null,
+  assetBase: string | undefined,
 ): LoadedSquad {
   const formation = team?.formation;
   if (!team || !formation) throw unplayable(matchId, side, 'has no formation');
@@ -66,26 +71,28 @@ function toLoadedSquad(
       playerId: player.id,
       aliases: player.aliases.map((alias) => alias.normalized),
     })),
-    // image_key becomes a URL with B23
     players: lineups.map(({ slot, position, player }) => ({
       id: player.id,
       name: player.name,
       slot,
       position,
-      imageUrl: null,
+      imageUrl: assetUrl(assetBase, player.imageKey),
     })),
   };
 }
 
 @Injectable()
 export class SquadLoaderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
   async load(matchId: string, side: Side): Promise<LoadedSquad> {
     const team = await this.prisma.matchTeam.findUnique({
       where: { matchId_side: { matchId, side } },
       select: SQUAD_SELECT,
     });
-    return toLoadedSquad(matchId, side, team);
+    return toLoadedSquad(matchId, side, team, this.env.ASSET_BASE_URL);
   }
 }

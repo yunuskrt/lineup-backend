@@ -1,10 +1,11 @@
+import type { Env } from '@/config/env.schema.js';
 import { normalizeName } from '@/game/normalize.js';
 import { SquadLoaderService } from '@/matches/squad-loader.service.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
 import { type Tx, useRolledBackDb } from '@test/schema/schema-test-utils.js';
 
 const loader = (tx: Tx) =>
-  new SquadLoaderService(tx as unknown as PrismaService);
+  new SquadLoaderService(tx as unknown as PrismaService, {} as Env);
 
 // Any seeded match with both XIs complete
 async function seededMatchId(tx: Tx): Promise<string> {

@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ENV } from '@/config/config.module.js';
+import type { Env } from '@/config/env.schema.js';
 import type { FilterOptions } from '@/contract/catalog.js';
 import { MatchSelectorService } from '@/matches/match-selector.service.js';
 import { toClubRef, toCompetitionRef } from '@/matches/match-refs.js';
@@ -16,6 +18,7 @@ export class CatalogService {
   constructor(
     private readonly selector: MatchSelectorService,
     private readonly prisma: PrismaService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   // Only what the pool can serve; never every row
@@ -32,13 +35,15 @@ export class CatalogService {
       }),
       this.prisma.club.findMany({
         where: { id: { in: coverage.clubIds } },
-        select: { id: true, name: true, shortName: true },
+        select: { id: true, name: true, shortName: true, crestKey: true },
       }),
     ]);
 
     return {
       competitions: competitions.sort(byName).map(toCompetitionRef),
-      clubs: clubs.sort(byName).map(toClubRef),
+      clubs: clubs
+        .sort(byName)
+        .map((club) => toClubRef(club, this.env.ASSET_BASE_URL)),
       era: coverage.era,
     };
   }

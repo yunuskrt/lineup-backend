@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { ApiException } from '@/common/api-exception.js';
+import { ENV } from '@/config/config.module.js';
+import type { Env } from '@/config/env.schema.js';
 import type {
   HistoryEntry,
   HistoryPage,
@@ -44,7 +46,10 @@ const finished = (userId: string): Prisma.GameParticipantWhereInput => ({
 
 @Injectable()
 export class HistoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
   async historyOf(userId: string, query: HistoryQuery): Promise<HistoryPage> {
     const from = query.cursor
@@ -61,7 +66,9 @@ export class HistoryService {
     const found = await this.foundCounts(page.map((row) => row.sessionId));
 
     return {
-      entries: page.map((row) => toEntry(row, found.get(row.sessionId) ?? 0)),
+      entries: page.map((row) =>
+        toEntry(row, found.get(row.sessionId) ?? 0, this.env.ASSET_BASE_URL),
+      ),
       nextCursor: rows[query.limit]?.sessionId ?? null,
     };
   }
@@ -109,7 +116,11 @@ export class HistoryService {
   }
 }
 
-function toEntry(row: EntryRow, foundCount: number): HistoryEntry {
+function toEntry(
+  row: EntryRow,
+  foundCount: number,
+  assetBase: string | undefined,
+): HistoryEntry {
   const { session } = row;
   // B08's CHECK sets ended_at on every finished session
   if (!session.endedAt) throw new Error(`Session ${row.sessionId} not over`);
@@ -117,7 +128,7 @@ function toEntry(row: EntryRow, foundCount: number): HistoryEntry {
   const base = {
     id: row.sessionId,
     playedAt: session.endedAt.toISOString(),
-    match: toMatchIdentity(session.match),
+    match: toMatchIdentity(session.match, assetBase),
     foundCount,
     livesRemaining: row.livesRemaining,
   };

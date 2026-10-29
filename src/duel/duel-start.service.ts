@@ -7,6 +7,8 @@ import {
 import { ApiException, SERVER_ERROR_MESSAGE } from '@/common/api-exception.js';
 import { CLOCK, type Clock } from '@/common/clock.js';
 import { RANDOM, type Random } from '@/common/random.js';
+import { ENV } from '@/config/config.module.js';
+import type { Env } from '@/config/env.schema.js';
 import type { User } from '@/contract/auth.js';
 import type { DuelEventMap } from '@/contract/duel.js';
 import type { Filters } from '@/contract/match.js';
@@ -70,6 +72,7 @@ export class DuelStartService implements OnModuleDestroy {
     @Inject(RANDOM) private readonly random: Random,
     @Inject(FILTER_WINDOW_MS) private readonly filterWindowMs: number,
     @Inject(FLIP_REVEAL_MS) private readonly flipRevealMs: number,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   open(room: FiltersRoom): void {
@@ -203,7 +206,8 @@ export class DuelStartService implements OnModuleDestroy {
       where: { id: matchId },
       select: MATCH_IDENTITY_SELECT,
     });
-    return { match: toMatchIdentity(row), side, squad };
+    const match = toMatchIdentity(row, this.env.ASSET_BASE_URL);
+    return { match, side, squad };
   }
 
   private begin(roomId: string, resolved: Resolved): void {

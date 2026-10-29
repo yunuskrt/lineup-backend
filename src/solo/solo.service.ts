@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { ApiException } from '@/common/api-exception.js';
 import { CLOCK, type Clock } from '@/common/clock.js';
+import { ENV } from '@/config/config.module.js';
+import type { Env } from '@/config/env.schema.js';
 import type { User } from '@/contract/auth.js';
 import type { Side } from '@/contract/common.js';
 import type { Filters, MatchIdentity } from '@/contract/match.js';
@@ -72,6 +74,7 @@ export class SoloService {
     private readonly store: SoloSessionStore,
     private readonly persistence: SoloPersistenceService,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   async start(user: User, filters: Filters): Promise<SoloMatchOffer> {
@@ -197,7 +200,7 @@ export class SoloService {
       where: { id: matchId },
       select: MATCH_IDENTITY_SELECT,
     });
-    return toMatchIdentity(match);
+    return toMatchIdentity(match, this.env.ASSET_BASE_URL);
   }
 
   // One open run per user: the old one ends

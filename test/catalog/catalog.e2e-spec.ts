@@ -176,10 +176,10 @@ describe('CatalogService over a rolled-back pool (e2e)', () => {
     const result = await rolledBack(async (tx) => {
       const ids = await build(tx);
       const db = tx as unknown as PrismaService;
-      const selector = new MatchSelectorService(db, {
-        MATCH_POOL_INCLUDE_UNSCORED: false,
-      } as Env);
-      const options = await new CatalogService(selector, db).filterOptions();
+      const env = { MATCH_POOL_INCLUDE_UNSCORED: false } as Env;
+      const selector = new MatchSelectorService(db, env);
+      const catalog = new CatalogService(selector, db, env);
+      const options = await catalog.filterOptions();
       return { ids, listed: options.competitions.map((c) => c.id) };
     });
     expect(result.listed).toContain(result.ids.inId);

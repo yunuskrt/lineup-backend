@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ENV } from '@/config/config.module.js';
+import type { Env } from '@/config/env.schema.js';
 import type { UserStats } from '@/contract/profile.js';
 import { toClubRef } from '@/matches/match-refs.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
@@ -17,7 +19,10 @@ const NO_STATS: UserStats = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
   async statsOf(userId: string): Promise<UserStats> {
     const row = await this.prisma.userStats.findUnique({
@@ -35,7 +40,9 @@ export class UsersService {
         row.totalGuesses === 0 ? 0 : row.correctGuesses / row.totalGuesses,
       bestStreak: row.bestStreak,
       perfectClears: row.perfectClears,
-      favouriteClub: row.favouriteClub ? toClubRef(row.favouriteClub) : null,
+      favouriteClub: row.favouriteClub
+        ? toClubRef(row.favouriteClub, this.env.ASSET_BASE_URL)
+        : null,
     };
   }
 }

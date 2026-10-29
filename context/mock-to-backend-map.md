@@ -17,7 +17,7 @@ Every behaviour the web app's mock fakes today, and the backend phase that makes
 | --- | --- | --- |
 | 10 fictional fixtures, 167 players with aliases (`mock/data/*.ts`) | B05–B08 schema; **B09 seeds these same fixtures** into a Neon dev branch | W27 |
 | Fixtures validated by Zod at load (`mock/types.ts`) | Prisma schema and constraints (B04–B08) | — |
-| Placeholder SVG crests and headshots in `public/mock/`, root-relative URLs | B23 bucket, B24 image ingest: absolute CDN URLs | W27: tighten `imageUrlSchema` |
+| Placeholder SVG crests and headshots in `public/mock/`, root-relative URLs | **Done by R2:** absolute `https` URLs, `<ASSET_BASE_URL>/<key>`, from the bucket the scraper fills (S17, S18) | W27: tighten `imageUrlSchema` (later web task) |
 | No real data at all | B15–B22 ingestion, memorability, guessability gate, pool QA | — |
 
 ### Auth and session
@@ -105,6 +105,6 @@ Web phases W33 (observability) and W34–W35 (E2E, deployment) follow once B45 i
 1. **Catalog endpoint.** `getFilterOptions` is owned by B25b, added after B25 in the backend `todo.md`.
 2. **Matcher.** Copy the mock's matcher test cases into B28, since `pg_trgm` scores differently. One example: "Ronaldo" must never resolve to "Ronaldinho".
 3. **In-play match.** B33 and B38 must send the full match, crests and scores included, during play. That's a recent web change.
-4. **Image URLs.** Real image URLs are absolute. The root-relative branch of `imageUrlSchema` exists only for the mock.
+4. **Image URLs.** Real image URLs are absolute `https` (R2), or `null`. The root-relative branch of `imageUrlSchema` exists only for the mock.
 5. **Queue timeout.** B37 must emit `queueTimedOut`. Today only a scenario reaches it.
 6. **Entitlements.** Pro-only behaviour (the missed list) needs a server-resolved tier, even though monetization is Deferred.

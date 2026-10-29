@@ -1,5 +1,6 @@
 import { ApiException } from '@/common/api-exception.js';
 import type { Clock } from '@/common/clock.js';
+import type { Env } from '@/config/env.schema.js';
 import type { User } from '@/contract/auth.js';
 import type { Filters } from '@/contract/match.js';
 import type { MatchSelectorService } from '@/matches/match-selector.service.js';
@@ -29,7 +30,12 @@ const FILTERS: Filters = {
   era: { from: 2000, to: 2025 },
 };
 
-const club = (id: string) => ({ id, name: `Club ${id}`, shortName: 'CLB' });
+const club = (id: string) => ({
+  id,
+  name: `Club ${id}`,
+  shortName: 'CLB',
+  crestKey: null,
+});
 const MATCH_ROW = {
   id: 'm-1',
   date: new Date('2005-05-25T00:00:00.000Z'),
@@ -59,6 +65,7 @@ function setup() {
     store,
     { save } as unknown as SoloPersistenceService,
     clock,
+    {} as Env,
   );
   return { service, clock, select, load, store, save };
 }

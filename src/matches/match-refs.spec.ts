@@ -20,9 +20,12 @@ const CLUB = {
   updatedAt: new Date(),
 };
 
+const BASE = 'https://bucket.example.com/images';
+const CREST = 'crests/yildiz/0123456789ab.webp';
+
 describe('toClubRef', () => {
   it('maps a club to a contract ClubRef', () => {
-    const ref = toClubRef(CLUB);
+    const ref = toClubRef(CLUB, undefined);
 
     expect(ref).toEqual({
       id: CLUB.id,
@@ -33,10 +36,17 @@ describe('toClubRef', () => {
     expect(clubRefSchema.parse(ref)).toEqual(ref);
   });
 
-  it('never sends a bucket key as a URL', () => {
-    expect(toClubRef({ ...CLUB, crestKey: 'crests/yildiz.svg' }).crestUrl).toBe(
+  it('sends no crest URL without a base', () => {
+    expect(toClubRef({ ...CLUB, crestKey: CREST }, undefined).crestUrl).toBe(
       null,
     );
+  });
+
+  // Never the raw key on its own
+  it('sends a crest as a full URL under the base', () => {
+    const ref = toClubRef({ ...CLUB, crestKey: CREST }, BASE);
+    expect(ref.crestUrl).toBe(`${BASE}/${CREST}`);
+    expect(clubRefSchema.parse(ref)).toEqual(ref);
   });
 });
 
@@ -45,6 +55,7 @@ describe('toMatchIdentity', () => {
     id,
     name,
     shortName,
+    crestKey: `crests/${id}/0123456789ab.webp`,
   });
   const MATCH = {
     id: '01900000-0000-7000-8000-0000000000e1',
@@ -63,7 +74,7 @@ describe('toMatchIdentity', () => {
   };
 
   it('maps a match, sides and scores the right way round', () => {
-    const identity = toMatchIdentity(MATCH);
+    const identity = toMatchIdentity(MATCH, undefined);
 
     expect(identity).toEqual({
       id: MATCH.id,
@@ -79,24 +90,39 @@ describe('toMatchIdentity', () => {
     expect(matchIdentitySchema.parse(identity)).toEqual(identity);
   });
 
+  it('gives both sides a crest URL under the base', () => {
+    const identity = toMatchIdentity(MATCH, BASE);
+
+    expect(identity.home.crestUrl).toBe(
+      `${BASE}/crests/c-home/0123456789ab.webp`,
+    );
+    expect(identity.away.crestUrl).toBe(
+      `${BASE}/crests/c-away/0123456789ab.webp`,
+    );
+    expect(matchIdentitySchema.parse(identity)).toEqual(identity);
+  });
+
   it('keeps a nickname and a null stage', () => {
-    const identity = toMatchIdentity({
-      ...MATCH,
-      stage: null,
-      nickname: 'The Rain Final',
-    });
+    const identity = toMatchIdentity(
+      { ...MATCH, stage: null, nickname: 'The Rain Final' },
+      undefined,
+    );
 
     expect(identity).toMatchObject({ stage: null, nickname: 'The Rain Final' });
   });
 
   it('refuses a match missing a side', () => {
     expect(() =>
-      toMatchIdentity({ ...MATCH, teams: MATCH.teams.slice(0, 1) }),
+      toMatchIdentity({ ...MATCH, teams: MATCH.teams.slice(0, 1) }, undefined),
     ).toThrow(/lacks a side/);
   });
 
   it('adds the side and formation for play', () => {
-    const inPlay = toMatchInPlay(toMatchIdentity(MATCH), 'away', '4-2-3-1');
+    const inPlay = toMatchInPlay(
+      toMatchIdentity(MATCH, undefined),
+      'away',
+      '4-2-3-1',
+    );
 
     expect(inPlay).toMatchObject({ side: 'away', formation: '4-2-3-1' });
     expect(matchInPlaySchema.parse(inPlay)).toEqual(inPlay);

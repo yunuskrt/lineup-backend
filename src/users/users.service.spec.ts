@@ -1,3 +1,4 @@
+import type { Env } from '@/config/env.schema.js';
 import { userStatsSchema } from '@/contract/profile.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
 import { UsersService } from '@/users/users.service.js';
@@ -28,7 +29,10 @@ const row = (extra: object = {}) => ({
 describe('UsersService', () => {
   // A read only: any write would throw here
   const prisma = { userStats: { findUnique: vi.fn() } };
-  const service = new UsersService(prisma as unknown as PrismaService);
+  const service = new UsersService(
+    prisma as unknown as PrismaService,
+    {} as Env,
+  );
 
   beforeEach(() => {
     vi.resetAllMocks();

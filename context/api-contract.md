@@ -84,7 +84,7 @@ A plain-text transcription of what `lineup-web` sends and expects today, taken f
 | Root-relative path with **one** leading slash and no spaces, `?` or `#` (e.g. `/mock/crests/x.svg`) | `data:`, `javascript:`, `ftp:` and any other scheme |
 | | Bare relative paths (`mock/x.svg`, `./x.svg`), `/` alone, empty string |
 
-**The backend should always send absolute CDN URLs.** The root-relative branch exists only for the web mock's own assets, and the web will tighten it at W27.
+**The backend sends absolute `https` URLs, or `null`** (R2): `<ASSET_BASE_URL>/<key>`, straight from the public bucket, never proxied. With `ASSET_BASE_URL` unset, every `crestUrl` and `imageUrl` is `null`. The root-relative branch exists only for the web mock's own assets, and the web will tighten it at W27.
 
 ### `ClubRef`
 

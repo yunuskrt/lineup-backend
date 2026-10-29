@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { ApiException } from '@/common/api-exception.js';
 import type { Clock } from '@/common/clock.js';
+import type { Env } from '@/config/env.schema.js';
 import type { User } from '@/contract/auth.js';
 import { duelPlayer } from '@/contract/contract.fixtures.js';
 import type { DuelEventMap } from '@/contract/duel.js';
@@ -39,7 +40,12 @@ const A_FILTERS: Filters = {
 };
 const B_FILTERS: Filters = { ...NO_PREFERENCE, clubIds: ['liv'] };
 
-const club = (id: string) => ({ id, name: `Club ${id}`, shortName: 'CLB' });
+const club = (id: string) => ({
+  id,
+  name: `Club ${id}`,
+  shortName: 'CLB',
+  crestKey: null,
+});
 const MATCH_ROW = {
   id: 'm-1',
   date: new Date('2005-05-25T00:00:00.000Z'),
@@ -87,6 +93,7 @@ function setup(draw = 0.1) {
     random,
     WINDOW_MS,
     REVEAL_MS,
+    {} as Env,
   );
 
   const room = rooms.open(duelPlayer('a'), duelPlayer('b'), T0);

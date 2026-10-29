@@ -361,6 +361,34 @@ describe('parseEnv', () => {
     });
   });
 
+  describe('ASSET_BASE_URL', () => {
+    const BUCKET = 'https://bucket.example.com/images';
+
+    it('is optional, and absent by default', () => {
+      const result = parseEnv(base);
+      expect(result.success && result.data.ASSET_BASE_URL).toBeUndefined();
+    });
+
+    it.each([
+      ['as given', BUCKET],
+      ['without a trailing slash', `${BUCKET}/`],
+    ])('keeps the base %s', (_, url) => {
+      const result = parseEnv({ ...base, ASSET_BASE_URL: url });
+      expect(result.success && result.data.ASSET_BASE_URL).toBe(BUCKET);
+    });
+
+    it.each([
+      ['plain http', 'http://bucket.example.com/images'],
+      ['a non-URL', 'images'],
+      ['an empty string', ''],
+    ])('refuses %s', (_, url) => {
+      const result = parseEnv({ ...base, ASSET_BASE_URL: url });
+      expect(!result.success && result.error.map((i) => i.key)).toEqual([
+        'ASSET_BASE_URL',
+      ]);
+    });
+  });
+
   it('never echoes a rejected value', () => {
     const values = {
       NODE_ENV: 'hunter2-secret',

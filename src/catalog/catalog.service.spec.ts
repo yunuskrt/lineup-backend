@@ -1,4 +1,5 @@
 import { CatalogService } from '@/catalog/catalog.service.js';
+import type { Env } from '@/config/env.schema.js';
 import { filterOptionsSchema } from '@/contract/catalog.js';
 import type { MatchSelectorService } from '@/matches/match-selector.service.js';
 import type { PoolCandidate } from '@/matches/pool-rules.js';
@@ -11,16 +12,22 @@ const candidate = (
   seasonStart: number,
 ): PoolCandidate => ({ matchId, competitionId, clubIds, seasonStart });
 
+const BASE = 'https://bucket.example.com/images';
+const CREST = 'crests/yildiz/0123456789ab.webp';
+
 describe('CatalogService', () => {
   const selector = { candidates: vi.fn() };
   const prisma = {
     competition: { findMany: vi.fn() },
     club: { findMany: vi.fn() },
   };
-  const service = new CatalogService(
-    selector as unknown as MatchSelectorService,
-    prisma as unknown as PrismaService,
-  );
+  const catalog = (env: Partial<Env>) =>
+    new CatalogService(
+      selector as unknown as MatchSelectorService,
+      prisma as unknown as PrismaService,
+      env as Env,
+    );
+  const service = catalog({});
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -33,9 +40,9 @@ describe('CatalogService', () => {
       { id: 'comp-1', kind: 'league', name: 'Ankara League' },
     ]);
     prisma.club.findMany.mockResolvedValue([
-      { id: 'club-3', name: 'Yıldız', shortName: 'YLD' },
-      { id: 'club-1', name: 'Örnek', shortName: 'ORN' },
-      { id: 'club-2', name: 'Bravo', shortName: 'BRV' },
+      { id: 'club-3', name: 'Yıldız', shortName: 'YLD', crestKey: CREST },
+      { id: 'club-1', name: 'Örnek', shortName: 'ORN', crestKey: null },
+      { id: 'club-2', name: 'Bravo', shortName: 'BRV', crestKey: null },
     ]);
   });
 
@@ -47,7 +54,7 @@ describe('CatalogService', () => {
     });
     expect(prisma.club.findMany).toHaveBeenCalledWith({
       where: { id: { in: ['club-1', 'club-2', 'club-3'] } },
-      select: { id: true, name: true, shortName: true },
+      select: { id: true, name: true, shortName: true, crestKey: true },
     });
   });
 
@@ -66,6 +73,15 @@ describe('CatalogService', () => {
       era: { from: 2004, to: 2018 },
     });
     expect(filterOptionsSchema.safeParse(options).success).toBe(true);
+  });
+
+  it('sends a crest URL under the base, if the club has one', async () => {
+    const { clubs } = await catalog({ ASSET_BASE_URL: BASE }).filterOptions();
+    expect(clubs.map((club) => club.crestUrl)).toEqual([
+      null,
+      null,
+      `${BASE}/${CREST}`,
+    ]);
   });
 
   it('breaks a name tie by id', async () => {

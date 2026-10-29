@@ -6,13 +6,15 @@ import type {
   MatchIdentity,
   MatchInPlay,
 } from '@/contract/match.js';
+import { assetUrl } from '@/matches/asset-url.js';
 
-type ClubRow = Pick<Club, 'id' | 'name' | 'shortName'>;
+type ClubRow = Pick<Club, 'id' | 'name' | 'shortName' | 'crestKey'>;
 
 const CLUB_REF_SELECT = {
   id: true,
   name: true,
   shortName: true,
+  crestKey: true,
 } satisfies Prisma.ClubSelect;
 
 // Never selects a lineup: the squad stays put
@@ -36,13 +38,15 @@ type MatchRow = Prisma.MatchGetPayload<{
   select: typeof MATCH_IDENTITY_SELECT;
 }>;
 
-// crest_key is a bucket key; URLs arrive with B23
-export function toClubRef(club: ClubRow): ClubRef {
+export function toClubRef(
+  club: ClubRow,
+  assetBase: string | undefined,
+): ClubRef {
   return {
     id: club.id,
     name: club.name,
     shortName: club.shortName,
-    crestUrl: null,
+    crestUrl: assetUrl(assetBase, club.crestKey),
   };
 }
 
@@ -52,7 +56,10 @@ export function toCompetitionRef(
   return { id: competition.id, kind: competition.kind, name: competition.name };
 }
 
-export function toMatchIdentity(match: MatchRow): MatchIdentity {
+export function toMatchIdentity(
+  match: MatchRow,
+  assetBase: string | undefined,
+): MatchIdentity {
   const home = match.teams.find((team) => team.side === 'home');
   const away = match.teams.find((team) => team.side === 'away');
   if (!home || !away) throw new Error(`Match ${match.id} lacks a side`);
@@ -64,8 +71,8 @@ export function toMatchIdentity(match: MatchRow): MatchIdentity {
     // A DATE column arrives as UTC midnight
     date: match.date.toISOString().slice(0, 10),
     stage: match.stage,
-    home: toClubRef(home.club),
-    away: toClubRef(away.club),
+    home: toClubRef(home.club, assetBase),
+    away: toClubRef(away.club, assetBase),
     score: { home: home.goals, away: away.goals },
     nickname: match.nickname,
   };

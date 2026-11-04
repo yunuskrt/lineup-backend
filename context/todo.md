@@ -9,7 +9,7 @@ This todo file is for developer-side use.
 **Order** (see `context/docs/build-order.md`):
 
 1. **Gameplay on the seeded mock data:** B25–B43.
-2. **Real data:** B15–B24 and B26. Phases tagged `→ scraper repo` move to a separate scraper repo; the backend loads its output. Re-spec them before starting.
+2. **Real data:** B15–B22 and B26. Phases tagged `→ scraper repo` move to a separate scraper repo; the backend loads its output. Re-spec them before starting.
 3. **Ops:** B44–B46, any time after B43.
 
 ## Backend (NestJS)
@@ -55,8 +55,6 @@ This todo file is for developer-side use.
 - [ ] **Phase B20 — Lineup Ingest**: Pull full starting XIs for the shortlisted matches only. → scraper repo
 - [ ] **Phase B21 — Guessability Gate**: Hard filter requiring all 11 starters to resolve with alias sets.
 - [ ] **Phase B22 — Pool QA Report**: Script reporting pool size and coverage gaps per league, era and club.
-- [ ] **Phase B23 — Storage Module**: Bucket client behind an interface; Postgres holds keys, never binaries.
-- [ ] **Phase B24 — Image Ingest**: Player and crest images with licence checks and attribution recorded.
 - [ ] **Phase B26 — Indexes & Performance**: Index the alias, match and lineup hot paths; measure trigram cost.
 - [ ] **Phase B44 — Observability**: Sentry, structured logs, health checks and draw-rate instrumentation.
 - [ ] **Phase B45 — Deployment**: Railway or Fly with `migrate deploy` before start, plus a staging env.

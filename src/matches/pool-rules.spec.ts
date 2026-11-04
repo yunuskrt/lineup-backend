@@ -1,5 +1,6 @@
 import type { Filters } from '@/contract/match.js';
 import {
+  competitionCoverage,
   emptyReason,
   eraBucketOf,
   matchesFilters,
@@ -282,5 +283,63 @@ describe('poolCoverage', () => {
       from: 2010,
       to: 2010,
     });
+  });
+});
+
+describe('competitionCoverage', () => {
+  it('is empty for an empty pool', () => {
+    expect(competitionCoverage([]).size).toBe(0);
+  });
+
+  it('lists a club under each competition it plays in', () => {
+    const coverage = competitionCoverage([
+      candidate('m1'),
+      candidate('m2', {
+        competitionId: 'comp-b',
+        clubIds: ['club-a', 'club-c'],
+      }),
+    ]);
+    expect(coverage.get('comp-a')?.clubIds).toEqual(['club-a', 'club-b']);
+    expect(coverage.get('comp-b')?.clubIds).toEqual(['club-a', 'club-c']);
+  });
+
+  it('covers a one-match competition: both sides, one season', () => {
+    const coverage = competitionCoverage([
+      candidate('m1', { competitionId: 'comp-b', seasonStart: 2004 }),
+    ]);
+    expect(coverage.get('comp-b')).toEqual({
+      clubIds: ['club-a', 'club-b'],
+      seasonStarts: [2004],
+    });
+  });
+
+  it('gives one season when every match shares it', () => {
+    const coverage = competitionCoverage([
+      candidate('m1'),
+      candidate('m2', { clubIds: ['club-c', 'club-d'] }),
+      candidate('m3', { clubIds: ['club-b', 'club-c'] }),
+    ]);
+    expect(coverage.get('comp-a')?.seasonStarts).toEqual([2010]);
+  });
+
+  it('sorts seasons ascending and repeats nothing', () => {
+    const coverage = competitionCoverage([
+      candidate('m1', { seasonStart: 2019 }),
+      candidate('m2', { seasonStart: 2003, clubIds: ['club-b', 'club-a'] }),
+      candidate('m3', { seasonStart: 2019 }),
+      candidate('m4', { seasonStart: 2011 }),
+    ]);
+    expect(coverage.get('comp-a')).toEqual({
+      clubIds: ['club-a', 'club-b'],
+      seasonStarts: [2003, 2011, 2019],
+    });
+  });
+
+  it('keys only the competitions in the pool', () => {
+    const coverage = competitionCoverage([
+      candidate('m1'),
+      candidate('m2', { competitionId: 'comp-b' }),
+    ]);
+    expect([...coverage.keys()]).toEqual(['comp-a', 'comp-b']);
   });
 });

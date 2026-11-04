@@ -62,8 +62,20 @@ describe('CatalogService', () => {
     const options = await service.filterOptions();
     expect(options).toEqual({
       competitions: [
-        { id: 'comp-1', kind: 'league', name: 'Ankara League' },
-        { id: 'comp-2', kind: 'ucl', name: 'Zenith Cup' },
+        {
+          id: 'comp-1',
+          kind: 'league',
+          name: 'Ankara League',
+          clubIds: ['club-2', 'club-1'],
+          seasonStarts: [2004],
+        },
+        {
+          id: 'comp-2',
+          kind: 'ucl',
+          name: 'Zenith Cup',
+          clubIds: ['club-2', 'club-3'],
+          seasonStarts: [2018],
+        },
       ],
       clubs: [
         { id: 'club-2', name: 'Bravo', shortName: 'BRV', crestUrl: null },
@@ -73,6 +85,31 @@ describe('CatalogService', () => {
       era: { from: 2004, to: 2018 },
     });
     expect(filterOptionsSchema.safeParse(options).success).toBe(true);
+  });
+
+  // Bravo before Örnek: the clubs list order
+  it('gives each competition its clubs in clubs order and its seasons', async () => {
+    selector.candidates.mockResolvedValue([
+      candidate('m1', 'comp-1', ['club-1', 'club-2'], 2012),
+      candidate('m2', 'comp-1', ['club-3', 'club-1'], 2004),
+      candidate('m3', 'comp-1', ['club-2', 'club-1'], 2012),
+      candidate('m4', 'comp-2', ['club-3', 'club-2'], 2018),
+    ]);
+    const { competitions } = await service.filterOptions();
+    expect(
+      competitions.map(({ id, clubIds, seasonStarts }) => ({
+        id,
+        clubIds,
+        seasonStarts,
+      })),
+    ).toEqual([
+      {
+        id: 'comp-1',
+        clubIds: ['club-2', 'club-1', 'club-3'],
+        seasonStarts: [2004, 2012],
+      },
+      { id: 'comp-2', clubIds: ['club-2', 'club-3'], seasonStarts: [2018] },
+    ]);
   });
 
   it('sends a crest URL under the base, if the club has one', async () => {

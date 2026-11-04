@@ -220,9 +220,19 @@ The web only checks password **length**. The backend owns the password policy.
 
 | Field | Type |
 | --- | --- |
-| `competitions` | `CompetitionRef[]` |
-| `clubs` | `ClubRef[]` |
+| `competitions` | `CompetitionOption[]`, by name |
+| `clubs` | `ClubRef[]`, by name: every pool club |
 | `era` | `{ from, to }`, the covered season range |
+
+**`CompetitionOption`** (R3a). The pool's view of one competition, so a client can narrow the club and era pickers to it.
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| …every `CompetitionRef` field | | Unchanged |
+| `clubIds` | id[] | The pool clubs with at least one pool match in this competition. Every id is also in `clubs`, in the same order |
+| `seasonStarts` | integer[] | Season start years of its pool matches. Ascending, no repeats, never empty, each inside `era` |
+
+The `Filters` request is unchanged: `competitionIds` is still an array, and any number of ids is accepted.
 
 **`SoloMatchOffer`.** The run is created and the player picks a side next.
 

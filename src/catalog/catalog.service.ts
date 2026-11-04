@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ENV } from '@/config/config.module.js';
 import type { Env } from '@/config/env.schema.js';
-import type { FilterOptions } from '@/contract/catalog.js';
+import type { CompetitionOption, FilterOptions } from '@/contract/catalog.js';
 import { MatchSelectorService } from '@/matches/match-selector.service.js';
 import { toClubRef, toCompetitionRef } from '@/matches/match-refs.js';
-import { poolCoverage } from '@/matches/pool-rules.js';
+import { competitionCoverage, poolCoverage } from '@/matches/pool-rules.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 
 type Named = { id: string; name: string };
@@ -23,7 +23,8 @@ export class CatalogService {
 
   // Only what the pool can serve; never every row
   async filterOptions(): Promise<FilterOptions> {
-    const coverage = poolCoverage(await this.selector.candidates());
+    const candidates = await this.selector.candidates();
+    const coverage = poolCoverage(candidates);
     if (coverage.competitionIds.length === 0) {
       return { competitions: [], clubs: [], era: coverage.era };
     }
@@ -39,11 +40,28 @@ export class CatalogService {
       }),
     ]);
 
+    const sortedClubs = clubs.sort(byName);
+    const clubOrder = sortedClubs.map((club) => club.id);
+    const perCompetition = competitionCoverage(candidates);
+    const toOption = (
+      competition: (typeof competitions)[number],
+    ): CompetitionOption => {
+      const covered = perCompetition.get(competition.id);
+      // The query only reads covered competitions
+      if (!covered) throw new Error(`No coverage for ${competition.id}`);
+      const inPool = new Set(covered.clubIds);
+      return {
+        ...toCompetitionRef(competition),
+        clubIds: clubOrder.filter((id) => inPool.has(id)),
+        seasonStarts: covered.seasonStarts,
+      };
+    };
+
     return {
-      competitions: competitions.sort(byName).map(toCompetitionRef),
-      clubs: clubs
-        .sort(byName)
-        .map((club) => toClubRef(club, this.env.ASSET_BASE_URL)),
+      competitions: competitions.sort(byName).map(toOption),
+      clubs: sortedClubs.map((club) =>
+        toClubRef(club, this.env.ASSET_BASE_URL),
+      ),
       era: coverage.era,
     };
   }

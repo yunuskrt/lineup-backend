@@ -32,6 +32,7 @@ describe('contractRegistry', () => {
         'HistoryPage',
         'Profile',
         'FilterOptions',
+        'CompetitionOption',
       ]),
     );
   });

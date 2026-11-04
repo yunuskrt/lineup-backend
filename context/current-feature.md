@@ -55,3 +55,4 @@ Not Started
 - B43 Duel Integration Harness: DuelHarness, 4 whole games, 5 suites moved
 - R1 Transfermarkt Ids: nullable unique tm id on clubs, players, matches
 - R2 Image URLs: ASSET_BASE_URL + bucket key = crestUrl, imageUrl, or null
+- R3a Competition Filter Options: CompetitionOption clubIds, seasonStarts

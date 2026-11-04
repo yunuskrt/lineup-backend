@@ -52,6 +52,24 @@ describe('GET /catalog/filter-options (e2e)', () => {
     expect(res.body.data.era).toEqual(coverage.era);
   });
 
+  it('links each competition to its own clubs and seasons', async () => {
+    const res = await http().get('/catalog/filter-options');
+    const data = filterOptionsSchema.parse(res.body.data);
+    const clubs = new Set(data.clubs.map((club) => club.id));
+    expect(data.competitions.length).toBeGreaterThan(0);
+
+    for (const competition of data.competitions) {
+      expect(competition.seasonStarts.length).toBeGreaterThan(0);
+      for (const clubId of competition.clubIds) {
+        expect(clubs).toContain(clubId);
+      }
+      for (const start of competition.seasonStarts) {
+        expect(start).toBeGreaterThanOrEqual(data.era.from);
+        expect(start).toBeLessThanOrEqual(data.era.to);
+      }
+    }
+  });
+
   it('includes the seeded mock data when the dev flag is on', async () => {
     if (!env.MATCH_POOL_INCLUDE_UNSCORED) {
       throw new Error('E2E expects MATCH_POOL_INCLUDE_UNSCORED=true in .env');

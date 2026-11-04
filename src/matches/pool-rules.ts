@@ -37,6 +37,11 @@ export type PoolCoverage = {
   era: EraRange;
 };
 
+export type CompetitionCoverage = {
+  clubIds: string[];
+  seasonStarts: number[];
+};
+
 type FilterKey = Exclude<EmptyPoolReason, 'combination'>;
 
 const FILTER_ORDER: readonly FilterKey[] = ['competition', 'club', 'era'];
@@ -168,4 +173,29 @@ export function poolCoverage(
     clubIds: [...new Set(candidates.flatMap((c) => c.clubIds))],
     era: { from: Math.min(...starts), to: Math.max(...starts) },
   };
+}
+
+// Per competition id: its clubs and seasons
+export function competitionCoverage(
+  candidates: readonly PoolCandidate[],
+): Map<string, CompetitionCoverage> {
+  const sets = new Map<string, { clubs: Set<string>; starts: Set<number> }>();
+  for (const { competitionId, clubIds, seasonStart } of candidates) {
+    const entry = sets.get(competitionId) ?? {
+      clubs: new Set<string>(),
+      starts: new Set<number>(),
+    };
+    for (const clubId of clubIds) entry.clubs.add(clubId);
+    entry.starts.add(seasonStart);
+    sets.set(competitionId, entry);
+  }
+  return new Map(
+    [...sets].map(([id, { clubs, starts }]) => [
+      id,
+      {
+        clubIds: [...clubs],
+        seasonStarts: [...starts].sort((a, b) => a - b),
+      },
+    ]),
+  );
 }

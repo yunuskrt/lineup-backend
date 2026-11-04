@@ -75,7 +75,7 @@ export const matchInPlaySchema = matchIdentitySchema
   .register(contractRegistry, { id: 'MatchInPlay' });
 export type MatchInPlay = z.infer<typeof matchInPlaySchema>;
 
-const seasonStartSchema = z
+export const seasonStartSchema = z
   .number()
   .int()
   .min(FIRST_SEASON_START)

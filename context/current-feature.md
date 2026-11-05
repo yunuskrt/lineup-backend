@@ -56,3 +56,4 @@ Not Started
 - R1 Transfermarkt Ids: nullable unique tm id on clubs, players, matches
 - R2 Image URLs: ASSET_BASE_URL + bucket key = crestUrl, imageUrl, or null
 - R3a Competition Filter Options: CompetitionOption clubIds, seasonStarts
+- R3b Competition Logos: nullable logo_key, CompetitionRef.logoUrl or null

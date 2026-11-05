@@ -16,7 +16,12 @@ const MATCH = {
   nickname: null,
   season: {
     label: '2004-05',
-    competition: { id: 'comp-1', kind: 'ucl' as const, name: 'Cup' },
+    competition: {
+      id: 'comp-1',
+      kind: 'ucl' as const,
+      name: 'Cup',
+      logoKey: null,
+    },
   },
   teams: [
     {

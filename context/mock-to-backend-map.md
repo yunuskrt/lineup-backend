@@ -18,6 +18,7 @@ Every behaviour the web app's mock fakes today, and the backend phase that makes
 | 10 fictional fixtures, 167 players with aliases (`mock/data/*.ts`) | B05–B08 schema; **B09 seeds these same fixtures** into a Neon dev branch | W27 |
 | Fixtures validated by Zod at load (`mock/types.ts`) | Prisma schema and constraints (B04–B08) | — |
 | Placeholder SVG crests and headshots in `public/mock/`, root-relative URLs | **Done by R2:** absolute `https` URLs, `<ASSET_BASE_URL>/<key>`, from the bucket the scraper fills (S17, S18) | W27: tighten `imageUrlSchema` (later web task) |
+| No competition logos | **R3b:** `CompetitionRef.logoUrl`, `<ASSET_BASE_URL>/<logo_key>` or `null` until the scraper uploads logos | Match Filters B: logos on the chips, a kind icon meanwhile |
 | No real data at all | B15–B22 ingestion, memorability, guessability gate, pool QA | — |
 
 ### Auth and session

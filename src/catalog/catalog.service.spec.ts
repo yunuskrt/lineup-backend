@@ -14,6 +14,7 @@ const candidate = (
 
 const BASE = 'https://bucket.example.com/images';
 const CREST = 'crests/yildiz/0123456789ab.webp';
+const LOGO = 'competitions/zenith-cup/0123456789ab.webp';
 
 describe('CatalogService', () => {
   const selector = { candidates: vi.fn() };
@@ -36,8 +37,8 @@ describe('CatalogService', () => {
       candidate('m2', 'comp-2', ['club-2', 'club-3'], 2018),
     ]);
     prisma.competition.findMany.mockResolvedValue([
-      { id: 'comp-2', kind: 'ucl', name: 'Zenith Cup' },
-      { id: 'comp-1', kind: 'league', name: 'Ankara League' },
+      { id: 'comp-2', kind: 'ucl', name: 'Zenith Cup', logoKey: LOGO },
+      { id: 'comp-1', kind: 'league', name: 'Ankara League', logoKey: null },
     ]);
     prisma.club.findMany.mockResolvedValue([
       { id: 'club-3', name: 'Yıldız', shortName: 'YLD', crestKey: CREST },
@@ -50,7 +51,7 @@ describe('CatalogService', () => {
     await service.filterOptions();
     expect(prisma.competition.findMany).toHaveBeenCalledWith({
       where: { id: { in: ['comp-1', 'comp-2'] } },
-      select: { id: true, kind: true, name: true },
+      select: { id: true, kind: true, name: true, logoKey: true },
     });
     expect(prisma.club.findMany).toHaveBeenCalledWith({
       where: { id: { in: ['club-1', 'club-2', 'club-3'] } },
@@ -66,6 +67,7 @@ describe('CatalogService', () => {
           id: 'comp-1',
           kind: 'league',
           name: 'Ankara League',
+          logoUrl: null,
           clubIds: ['club-2', 'club-1'],
           seasonStarts: [2004],
         },
@@ -73,6 +75,7 @@ describe('CatalogService', () => {
           id: 'comp-2',
           kind: 'ucl',
           name: 'Zenith Cup',
+          logoUrl: null,
           clubIds: ['club-2', 'club-3'],
           seasonStarts: [2018],
         },
@@ -118,6 +121,16 @@ describe('CatalogService', () => {
       null,
       null,
       `${BASE}/${CREST}`,
+    ]);
+  });
+
+  it('sends a logo URL under the base, if the competition has one', async () => {
+    const { competitions } = await catalog({
+      ASSET_BASE_URL: BASE,
+    }).filterOptions();
+    expect(competitions.map((competition) => competition.logoUrl)).toEqual([
+      null,
+      `${BASE}/${LOGO}`,
     ]);
   });
 

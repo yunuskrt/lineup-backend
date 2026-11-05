@@ -1,10 +1,12 @@
 import {
   clubRefSchema,
+  competitionRefSchema,
   matchIdentitySchema,
   matchInPlaySchema,
 } from '@/contract/match.js';
 import {
   toClubRef,
+  toCompetitionRef,
   toMatchIdentity,
   toMatchInPlay,
 } from '@/matches/match-refs.js';
@@ -22,6 +24,7 @@ const CLUB = {
 
 const BASE = 'https://bucket.example.com/images';
 const CREST = 'crests/yildiz/0123456789ab.webp';
+const LOGO = 'competitions/cup/0123456789ab.webp';
 
 describe('toClubRef', () => {
   it('maps a club to a contract ClubRef', () => {
@@ -50,6 +53,36 @@ describe('toClubRef', () => {
   });
 });
 
+describe('toCompetitionRef', () => {
+  const COMPETITION = {
+    id: 'comp-1',
+    kind: 'ucl' as const,
+    name: 'Cup',
+    logoKey: LOGO,
+  };
+
+  it('sends no logo URL without a base', () => {
+    expect(toCompetitionRef(COMPETITION, undefined)).toEqual({
+      id: 'comp-1',
+      kind: 'ucl',
+      name: 'Cup',
+      logoUrl: null,
+    });
+  });
+
+  it('sends no logo URL for a competition without one', () => {
+    const ref = toCompetitionRef({ ...COMPETITION, logoKey: null }, BASE);
+    expect(ref.logoUrl).toBeNull();
+  });
+
+  // Never the raw key on its own
+  it('sends a logo as a full URL under the base', () => {
+    const ref = toCompetitionRef(COMPETITION, BASE);
+    expect(ref.logoUrl).toBe(`${BASE}/${LOGO}`);
+    expect(competitionRefSchema.parse(ref)).toEqual(ref);
+  });
+});
+
 describe('toMatchIdentity', () => {
   const club = (id: string, name: string, shortName: string) => ({
     id,
@@ -64,7 +97,12 @@ describe('toMatchIdentity', () => {
     nickname: null,
     season: {
       label: '2004-05',
-      competition: { id: 'comp-1', kind: 'ucl' as const, name: 'Cup' },
+      competition: {
+        id: 'comp-1',
+        kind: 'ucl' as const,
+        name: 'Cup',
+        logoKey: LOGO,
+      },
     },
     // Away listed first: sides come from `side`
     teams: [
@@ -78,7 +116,7 @@ describe('toMatchIdentity', () => {
 
     expect(identity).toEqual({
       id: MATCH.id,
-      competition: { id: 'comp-1', kind: 'ucl', name: 'Cup' },
+      competition: { id: 'comp-1', kind: 'ucl', name: 'Cup', logoUrl: null },
       season: '2004-05',
       date: '2005-05-25',
       stage: 'Final',
@@ -90,9 +128,10 @@ describe('toMatchIdentity', () => {
     expect(matchIdentitySchema.parse(identity)).toEqual(identity);
   });
 
-  it('gives both sides a crest URL under the base', () => {
+  it('gives the competition and both sides URLs under the base', () => {
     const identity = toMatchIdentity(MATCH, BASE);
 
+    expect(identity.competition.logoUrl).toBe(`${BASE}/${LOGO}`);
     expect(identity.home.crestUrl).toBe(
       `${BASE}/crests/c-home/0123456789ab.webp`,
     );

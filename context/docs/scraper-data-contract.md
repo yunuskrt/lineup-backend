@@ -4,8 +4,8 @@ What `lineup-scraper` may write to the Lineup database, and the rules every row 
 
 | | |
 | --- | --- |
-| Generated from | `lineup-backend`, R2 (Image URLs), on 2026-10-29. First written 2026-10-24 at `f056b66` |
-| Latest migration | `20261028105720_transfermarkt_ids` |
+| Generated from | `lineup-backend`, R3b (Competition logos), on 2026-11-05. First written 2026-10-24 at `f056b66` |
+| Latest migration | `20261105075429_competition_logo_key` |
 | Schema file | `prisma/schema.prisma` (the scraper keeps a verbatim copy) |
 
 ---
@@ -33,6 +33,7 @@ Types are PostgreSQL types. "Null" means the column accepts `NULL`. Every table 
 | `slug` | `slug` | `TEXT` | no | Natural key |
 | `kind` | `kind` | `competition_kind` | no | `league`, `ucl`, `uel`, `world_cup`, `euro` |
 | `name` | `name` | `TEXT` | no | Display name, sent to clients |
+| `logo_key` | `logoKey` | `TEXT` | yes | Bucket object **key**, never a URL, no leading `/`. Sent as `<ASSET_BASE_URL>/<key>` (R3b). Scheme: `competitions/<competition-slug>/<sha256-12>.<ext>`, `ext` one of `webp`, `png`, `svg` |
 
 - **Unique:** `competitions_slug_key (slug)`
 - **CHECK `competitions_text_check`:** `btrim("slug") <> '' AND btrim("name") <> ''`
@@ -279,7 +280,7 @@ One row per scored match. **Internal only: never shown to a player** (Hard Const
 
 The scraper fills them, but nothing in the backend reads them today: `clubs.kind`, the three `transfermarkt_id` columns (and none ever will be sent to a client), `club_aliases`, `match_events`, `matches.extra_time`, `matches.shootout_*`, `memorability_scores.algorithm_version`, `computed_at`, and all per-signal keys except `sides`. Fill them correctly anyway: scoring and QA depend on them.
 
-`clubs.crest_key` and `players.image_key` **do** have a reader since R2 ("Image URLs"): the backend sends `<ASSET_BASE_URL>/<key>` as `crestUrl` and `imageUrl`, and `null` when the key or `ASSET_BASE_URL` is unset. It never calls the bucket and never sends a bare key. The bucket must be public-read, and a key's bytes must never change, since clients cache by URL.
+`clubs.crest_key` and `players.image_key` **do** have a reader since R2 ("Image URLs"), and `competitions.logo_key` since R3b: the backend sends `<ASSET_BASE_URL>/<key>` as `crestUrl`, `imageUrl` and `logoUrl`, and `null` when the key or `ASSET_BASE_URL` is unset. It never calls the bucket and never sends a bare key. The bucket must be public-read, and a key's bytes must never change, since clients cache by URL.
 
 ---
 
@@ -761,7 +762,7 @@ Ported **by hand** (read the file, write the scraper's own version). Never impor
 | | `scripts/seed/main.ts` | Transaction timeouts, counts-only output, error formatting |
 | | `test/schema/schema-test-utils.ts` | The rolled-back-transaction pattern for loader e2e tests |
 | **S16** Pool QA | `src/matches/match-selector.service.ts` (`poolWhere`), `src/matches/pool-rules.ts` (`sampleStratified`, `poolCoverage`) | Simulate what the backend will serve: pool size per competition, era and club |
-| **S17, S18** Storage, images | Nothing. `clubs.crest_key` and `players.image_key` are the only contract | Since R2 the backend sends `<ASSET_BASE_URL>/<key>` (§ 2.12); set `ASSET_BASE_URL` to `<endpoint>/<bucket>` on the backend |
+| **S17, S18** Storage, images | Nothing. `clubs.crest_key`, `players.image_key` and `competitions.logo_key` (R3b) are the only contract | Since R2 (R3b for logos) the backend sends `<ASSET_BASE_URL>/<key>` (§ 2.12); set `ASSET_BASE_URL` to `<endpoint>/<bucket>` on the backend |
 
 ---
 

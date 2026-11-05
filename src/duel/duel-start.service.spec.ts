@@ -53,7 +53,12 @@ const MATCH_ROW = {
   nickname: null,
   season: {
     label: '2004-05',
-    competition: { id: 'c-ucl', kind: 'ucl' as const, name: 'Cup' },
+    competition: {
+      id: 'c-ucl',
+      kind: 'ucl' as const,
+      name: 'Cup',
+      logoKey: null,
+    },
   },
   teams: [
     { side: 'home' as const, goals: 3, club: club('mil') },

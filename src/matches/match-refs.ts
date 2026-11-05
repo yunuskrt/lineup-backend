@@ -26,7 +26,9 @@ export const MATCH_IDENTITY_SELECT = {
   season: {
     select: {
       label: true,
-      competition: { select: { id: true, kind: true, name: true } },
+      competition: {
+        select: { id: true, kind: true, name: true, logoKey: true },
+      },
     },
   },
   teams: {
@@ -52,8 +54,14 @@ export function toClubRef(
 
 export function toCompetitionRef(
   competition: MatchRow['season']['competition'],
+  assetBase: string | undefined,
 ): CompetitionRef {
-  return { id: competition.id, kind: competition.kind, name: competition.name };
+  return {
+    id: competition.id,
+    kind: competition.kind,
+    name: competition.name,
+    logoUrl: assetUrl(assetBase, competition.logoKey),
+  };
 }
 
 export function toMatchIdentity(
@@ -66,7 +74,7 @@ export function toMatchIdentity(
 
   return {
     id: match.id,
-    competition: toCompetitionRef(match.season.competition),
+    competition: toCompetitionRef(match.season.competition, assetBase),
     season: match.season.label,
     // A DATE column arrives as UTC midnight
     date: match.date.toISOString().slice(0, 10),

@@ -76,7 +76,7 @@ A plain-text transcription of what `lineup-web` sends and expects today, taken f
 | `ConnectionStatus` | `connected`, `reconnecting`, `forfeited` |
 | `FilterSubmissionStatus` | `pending`, `submitted` |
 
-### `imageUrl` rule (used by `crestUrl` and `imageUrl`)
+### `imageUrl` rule (used by `crestUrl`, `imageUrl` and `logoUrl`)
 
 | Accepted | Rejected |
 | --- | --- |
@@ -102,6 +102,7 @@ A plain-text transcription of what `lineup-web` sends and expects today, taken f
 | `id` | id |
 | `kind` | `CompetitionKind` |
 | `name` | non-empty string |
+| `logoUrl` | imageUrl or `null` (R3b). Always present |
 
 ### `MatchIdentity`
 

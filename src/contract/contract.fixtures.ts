@@ -11,7 +11,12 @@ export const club = (id: string) => ({
 
 export const matchInPlay: MatchInPlay = {
   id: 'm-1',
-  competition: { id: 'c-ucl', kind: 'ucl', name: 'Champions League' },
+  competition: {
+    id: 'c-ucl',
+    kind: 'ucl',
+    name: 'Champions League',
+    logoUrl: null,
+  },
   season: '2004-05',
   date: '2005-05-25',
   stage: 'Final',

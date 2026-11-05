@@ -30,6 +30,7 @@ export const competitionRefSchema = z
     id: idSchema,
     kind: competitionKindSchema,
     name: z.string().min(1),
+    logoUrl: imageUrlSchema.nullable(),
   })
   .register(contractRegistry, { id: 'CompetitionRef' });
 export type CompetitionRef = z.infer<typeof competitionRefSchema>;

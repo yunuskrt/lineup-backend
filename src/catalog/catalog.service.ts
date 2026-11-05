@@ -32,7 +32,7 @@ export class CatalogService {
     const [competitions, clubs] = await Promise.all([
       this.prisma.competition.findMany({
         where: { id: { in: coverage.competitionIds } },
-        select: { id: true, kind: true, name: true },
+        select: { id: true, kind: true, name: true, logoKey: true },
       }),
       this.prisma.club.findMany({
         where: { id: { in: coverage.clubIds } },
@@ -51,7 +51,7 @@ export class CatalogService {
       if (!covered) throw new Error(`No coverage for ${competition.id}`);
       const inPool = new Set(covered.clubIds);
       return {
-        ...toCompetitionRef(competition),
+        ...toCompetitionRef(competition, this.env.ASSET_BASE_URL),
         clubIds: clubOrder.filter((id) => inPool.has(id)),
         seasonStarts: covered.seasonStarts,
       };

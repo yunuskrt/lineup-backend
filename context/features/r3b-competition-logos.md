@@ -2,7 +2,7 @@
 
 ## Status
 
-Not Started
+Complete
 
 ## Goals
 
@@ -47,10 +47,10 @@ Decided 2026-11-04, before load:
   - Rejected: a CHECK on `logo_key` only, or on all three key columns
 - **D2. `.env` goes to `dev` for the migration and the e2e run at `/feature test`, then back to the `ingest` line** (S20 uses it). `ingest` gets the migration through its own URL. The e2e suites never run on `ingest`
 
-Proposed:
+Approved at `/feature load` (2026-11-05), both as proposed:
 
 - **D3. `logoUrl` is always present, `null` when unset**, as `crestUrl` and `imageUrl` are (R2). Not optional
-- **D4. Depends on R3a** (`r3a-competition-filter-options.md`), merged first: `CompetitionOption` extends `CompetitionRef`
+- **D4. Depends on R3a** (`r3a-competition-filter-options.md`), merged first: `CompetitionOption` extends `CompetitionRef`. Satisfied: R3a is on `main` at `b9ef744`
 
 ## Notes
 
@@ -79,5 +79,22 @@ Proposed:
 - Afterwards:
   - **scraper:** copy `schema.prisma` and `data-contract.md`, run `npm run db:check`, then spec extending S18 to competition logos
   - **web:** mark R3 Part 2 done; Match Filters B draws the logos
+
+**Deviations recorded during implementation**
+
+- None of substance. `migrate dev --create-only` worked (no unique index to warn about), so `migrate diff` wasn't needed; the migration is not applied until `/feature test` (D2)
+- Added: `api-contract.md`'s `imageUrl` rule heading names `logoUrl`; `history.e2e-spec.ts`'s exact match expectation gains `logoUrl: null`
+
+**Test results (2026-11-05)**
+
+- `npm test` 1143 passed (+4); lint, build and `npx tsc --noEmit` clean
+- `dev`: `npm run db:deploy` applied `20261105075429_competition_logo_key`; `migrate status` 11 migrations, up to date; `migrate diff --exit-code` no drift
+- `npm run db:seed` on `dev`: 0 changed on all 8 tables
+- `npm run test:e2e` on `dev` (`ASSET_BASE_URL` unset): 448 passed
+- `GET /catalog/filter-options` on `dev`: 6 competitions, all with `logoUrl: null`; `/docs/openapi.json`: `logoUrl` required on `CompetitionRef`, inherited by `CompetitionOption`
+- `ingest` (approved): `migrate deploy` over the direct host `ep-fancy-fog-b1t4k7j7`, with the URL inline and `.env` untouched; 11 migrations, up to date, no drift
+- Neon, `dev` and `ingest`: `competitions.logo_key` is nullable `text`, the migration is finished; `ingest` has 11 competitions, 0 with a `logo_key`
+- `production` untouched
+- No new tests beyond the goals: `toCompetitionRef` is the only new logic, covered with and without a base or key
 
 ## History

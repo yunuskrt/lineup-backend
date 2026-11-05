@@ -259,6 +259,7 @@ describe('Profile history (e2e)', () => {
         id: expect.any(String),
         kind: 'ucl',
         name: 'Test History Cup',
+        logoUrl: null,
       },
       season: '2004-05',
       date: '2005-05-25',

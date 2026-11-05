@@ -6,9 +6,15 @@ import type {
   DuelSession,
   FilterSubmission,
 } from '@/contract/duel.js';
-import type { DuelActor, DuelFoundPlayer } from '@/contract/player.js';
+import type {
+  DuelActor,
+  DuelFoundPlayer,
+  DuelNamedPlayer,
+} from '@/contract/player.js';
 import type { RoundTiming } from '@/contract/round.js';
 import type { FoundPlayer, GameResult, Seat } from '@/game/engine.js';
+import { namedOrder, timedFound } from '@/game/summary.js';
+import type { TimedEffect } from '@/game/timed-game.js';
 import {
   type DuelRoom,
   otherSeat,
@@ -99,17 +105,36 @@ export function toDuelSession(
   };
 }
 
+// The duel's names, in order, with their times
+function namedAt(
+  room: PlayingRoom,
+  moment: Moment,
+  effects: readonly TimedEffect[],
+  receiver: Seat,
+): DuelNamedPlayer[] {
+  const named = namedOrder(room.firstRound, effects);
+  return timedFound(moment.found, named).map(
+    ({ order, elapsedMs, ...found }) => ({
+      ...toFoundPlayer(room, found, receiver),
+      order,
+      elapsedMs,
+    }),
+  );
+}
+
+// `effects`: the whole stream, the final step included
 export function toDuelResult(
   room: PlayingRoom,
   result: GameResult,
   receiver: Seat,
+  effects: readonly TimedEffect[],
   moment: Moment = momentOf(room),
 ): DuelResult {
   if (result.mode !== 'duel') throw new Error('Not a duel result');
   return {
     outcome: result.outcomes[receiver],
     match: room.match,
-    found: foundAt(room, moment, receiver),
+    found: namedAt(room, moment, effects, receiver),
     ...playersAt(room, moment, receiver),
     isForfeit: result.isForfeit,
   };

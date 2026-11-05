@@ -22,7 +22,7 @@ const { side: _side, formation: _formation, ...matchIdentity } = matchInPlay;
 
 const summary = {
   match: matchIdentity,
-  found: [revealedPlayer],
+  found: [{ ...revealedPlayer, order: 1, elapsedMs: 4_200 }],
   missedCount: 10,
   missed: null,
   livesRemaining: 0,
@@ -94,6 +94,36 @@ describe('soloSummarySchema', () => {
   ])('rejects %s', (_, overrides) => {
     expect(
       soloSummarySchema.safeParse({ ...summary, ...overrides }).success,
+    ).toBe(false);
+  });
+});
+
+describe('soloSummarySchema found timings', () => {
+  const named = (order: number, elapsedMs: number) => ({
+    ...summary,
+    found: [{ ...revealedPlayer, order, elapsedMs }],
+  });
+
+  it('accepts the first and last order and the full round', () => {
+    expect(soloSummarySchema.safeParse(named(1, 0)).success).toBe(true);
+    expect(soloSummarySchema.safeParse(named(11, 15_000)).success).toBe(true);
+  });
+
+  it.each([
+    ['order 0', 0, 1_000],
+    ['order 12', 12, 1_000],
+    ['a time past the round', 1, 15_001],
+    ['a negative time', 1, -1],
+  ])('refuses %s', (_, order, elapsedMs) => {
+    expect(soloSummarySchema.safeParse(named(order, elapsedMs)).success).toBe(
+      false,
+    );
+  });
+
+  it('refuses a found player with no timing', () => {
+    expect(
+      soloSummarySchema.safeParse({ ...summary, found: [revealedPlayer] })
+        .success,
     ).toBe(false);
   });
 });

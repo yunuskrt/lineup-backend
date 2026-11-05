@@ -77,7 +77,10 @@ describe('toSoloSummary', () => {
     expect(soloSummarySchema.parse(summary)).toEqual(summary);
     expect(summary).toEqual({
       match: IDENTITY,
-      found: [SQUAD.players[0], SQUAD.players[10]],
+      found: [
+        { ...SQUAD.players[0], order: 1, elapsedMs: 3_000 },
+        { ...SQUAD.players[10], order: 2, elapsedMs: 2_000 },
+      ],
       missedCount: 9,
       missed: null,
       livesRemaining: 3,
@@ -111,6 +114,14 @@ describe('toSoloSummary', () => {
       livesRemaining: 3,
       bestStreak: 11,
     });
+    expect(summary.found.map((player) => player.order)).toEqual(
+      NAMES.map((_, index) => index + 1),
+    );
+  });
+
+  it('refuses a run whose stream lacks a found name', () => {
+    const run = { ...quitAfterTwo(), effects: [] };
+    expect(() => toSoloSummary(run, 'free')).toThrow(/disagree/);
   });
 
   it('reports a run lost to the clock', () => {

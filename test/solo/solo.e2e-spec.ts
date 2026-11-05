@@ -204,6 +204,12 @@ describe('Solo (e2e)', () => {
       bestStreak: 11,
     });
     expect(summary.roundTimesMs).toEqual(Array(11).fill(1_000));
+    expect(summary.found.map((player) => player.order)).toEqual(
+      run.xi.map((_, index) => index + 1),
+    );
+    expect(summary.found.every((player) => player.elapsedMs === 1_000)).toBe(
+      true,
+    );
   });
 
   it('leaves the round alone on a repeat or a miss', async () => {
@@ -277,6 +283,28 @@ describe('Solo (e2e)', () => {
     const summary = dataOf(await run.quit(), soloSummarySchema);
     expect(summary).toMatchObject({ endReason: 'quit', livesRemaining: 3 });
     expect(dataOf(await run.summary(), soloSummarySchema)).toEqual(summary);
+  });
+
+  it('lists two names in the order named, each with its time', async () => {
+    const run = await playing(await guest());
+    const [first, second] = [run.xi[4], run.xi[1]];
+    clock.at += 1_500;
+    await run.guess(first.name);
+    clock.at += 4_000;
+    await run.guess(second.name);
+    clock.at += 500;
+    const summary = dataOf(await run.quit(), soloSummarySchema);
+
+    expect(
+      summary.found.map(({ id, order, elapsedMs }) => ({
+        id,
+        order,
+        elapsedMs,
+      })),
+    ).toEqual([
+      { id: first.id, order: 1, elapsedMs: 1_500 },
+      { id: second.id, order: 2, elapsedMs: 4_000 },
+    ]);
   });
 
   it('answers a quit after the lives run out with the real reason', async () => {

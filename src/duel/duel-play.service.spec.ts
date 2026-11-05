@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { ApiException } from '@/common/api-exception.js';
 import type { User } from '@/contract/auth.js';
 import { duelPlayer } from '@/contract/contract.fixtures.js';
@@ -220,6 +221,52 @@ describe('DuelPlayService', () => {
       expect(ctx.last('b', 'finished')).toMatchObject({ outcome: 'win' });
       expect(ctx.rooms.roomOf('a')).toBeNull();
       expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
+  describe('a view that fails to build', () => {
+    // The stored stream loses alfa: D2's check throws
+    function broken() {
+      const ctx = setup();
+      ctx.guess('a', 'alfa');
+      ctx.rooms.save({ ...(ctx.current() as PlayingRoom), effects: [] });
+      const log = vi
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => {});
+      return { ...ctx, log };
+    }
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('survives on the round timer and tells both players', () => {
+      const ctx = broken();
+      // b loses a life on expiries 1, 3 and 5
+      expect(() => vi.advanceTimersByTime((DEADLINE + 1) * 5)).not.toThrow();
+
+      for (const id of ['a', 'b']) {
+        expect(ctx.eventsOf(id)).not.toContain('finished');
+        expect(ctx.last(id, 'error')).toMatchObject({ code: 'server_error' });
+      }
+      expect(ctx.recorded).toHaveLength(1);
+      expect(ctx.rooms.roomOf('a')).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('logs the room only, never a name', () => {
+      const ctx = broken();
+      vi.advanceTimersByTime((DEADLINE + 1) * 5);
+
+      expect(ctx.log).toHaveBeenCalledTimes(1);
+      const [message] = ctx.log.mock.calls[0] as [string];
+      expect(message).toContain(ctx.room.id);
+      expect(message).not.toMatch(/alfa|secret/i);
+    });
+
+    it('survives a forfeit command the same way', () => {
+      const ctx = broken();
+      expect(() => ctx.service.forfeit(user('b'))).not.toThrow();
+      expect(ctx.last('a', 'error')).toMatchObject({ code: 'server_error' });
+      expect(ctx.eventsOf('a')).not.toContain('finished');
     });
   });
 

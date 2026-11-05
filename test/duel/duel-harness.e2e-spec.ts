@@ -80,7 +80,20 @@ function expectMirrored(a: Client, b: Client) {
   }
 }
 
+// Named order: 1…n, no gaps, each time in a round
+function expectNamedOrder(result: DuelResult) {
+  expect(result.found.map((player) => player.order)).toEqual(
+    result.found.map((_, index) => index + 1),
+  );
+  for (const { elapsedMs } of result.found) {
+    expect(elapsedMs).toBeGreaterThanOrEqual(0);
+    expect(elapsedMs).toBeLessThanOrEqual(ROUND_MS);
+  }
+}
+
 function expectMirroredResults(a: DuelResult, b: DuelResult) {
+  expectNamedOrder(a);
+  expectNamedOrder(b);
   expect(b.outcome).toBe(pairedOutcome(a.outcome, a.isForfeit));
   expect(b.isForfeit).toBe(a.isForfeit);
   expect(b.match).toEqual(a.match);

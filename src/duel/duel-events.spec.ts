@@ -8,11 +8,16 @@ import { NAMES } from '@/matches/squad.fixtures.js';
 
 const DEADLINE = ROUND_MS + GRACE_MS;
 
+// As DuelPlayService: the room keeps every effect
 function step(room: PlayingRoom, input: TimedInput, at: number) {
   const next = applyTimed(room.timed, input, at);
   return {
     events: eventsFor(room, next.effects),
-    after: { ...room, timed: next.timed } as PlayingRoom,
+    after: {
+      ...room,
+      timed: next.timed,
+      effects: [...room.effects, ...next.effects],
+    } as PlayingRoom,
   };
 }
 
@@ -189,6 +194,38 @@ describe('eventsFor', () => {
     const result = payloadOf(events, 1, 'finished') as { found: unknown[] };
     expect(result.found).toHaveLength(11);
     expectContract(events);
+  });
+
+  // The 11th name is in the step being replayed
+  it('times every name on the result, the last one included', () => {
+    let room = playingRoom(0);
+    let events: Outbound[] = [];
+    NAMES.forEach((name, index) => {
+      const seat = (index % 2) as 0 | 1;
+      const at = T0 + (index + 1) * 1_000;
+      ({ events, after: room } = step(room, guess(seat, name), at));
+    });
+
+    for (const seat of [0, 1] as const) {
+      const result = payloadOf(events, seat, 'finished') as {
+        found: {
+          id: string;
+          foundBy: string;
+          order: number;
+          elapsedMs: number;
+        }[];
+      };
+      expect(result.found.map((player) => player.order)).toEqual(
+        NAMES.map((_, index) => index + 1),
+      );
+      expect(result.found.every((player) => player.elapsedMs === 1_000)).toBe(
+        true,
+      );
+      expect(result.found.at(-1)).toMatchObject({
+        id: `p-${NAMES[10]}`,
+        foundBy: seat === 0 ? 'you' : 'opponent',
+      });
+    }
   });
 
   it('ends a forfeit with loss and forfeit_win', () => {

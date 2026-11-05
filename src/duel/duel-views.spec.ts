@@ -146,8 +146,8 @@ describe('toDuelResult', () => {
     ['a forfeit', duel(['forfeit_win', 'loss'], true)],
   ])('shows %s from each seat', (_, result) => {
     const room = playing();
-    const forA = toDuelResult(room, result, 0);
-    const forB = toDuelResult(room, result, 1);
+    const forA = toDuelResult(room, result, 0, room.effects);
+    const forB = toDuelResult(room, result, 1, room.effects);
 
     expect(duelResultSchema.parse(forA)).toEqual(forA);
     expect(forA.outcome).toBe(result.outcomes[0]);
@@ -159,13 +159,34 @@ describe('toDuelResult', () => {
     expect(forB.found).toMatchObject([{ id: 'p-alfa', foundBy: 'you' }]);
   });
 
+  it('gives each name its order and time, the same for both seats', () => {
+    const room = playing();
+    const result = duel(['win', 'loss']);
+    const timings = (seat: 0 | 1) =>
+      toDuelResult(room, result, seat, room.effects).found.map(
+        ({ order, elapsedMs }) => ({ order, elapsedMs }),
+      );
+    expect(timings(0)).toEqual([{ order: 1, elapsedMs: 0 }]);
+    expect(timings(1)).toEqual(timings(0));
+  });
+
+  it('refuses a stream that lacks a found name', () => {
+    const room = playing();
+    expect(() => toDuelResult(room, duel(['win', 'loss']), 0, [])).toThrow(
+      /disagree/,
+    );
+  });
+
   it('refuses a solo result', () => {
     const solo = {
       mode: 'solo' as const,
       endReason: 'quit' as const,
       livesRemaining: 3,
     };
-    expect(() => toDuelResult(playing(), solo, 0)).toThrow('Not a duel');
+    const room = playing();
+    expect(() => toDuelResult(room, solo, 0, room.effects)).toThrow(
+      'Not a duel',
+    );
   });
 });
 

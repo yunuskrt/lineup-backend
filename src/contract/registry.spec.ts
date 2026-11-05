@@ -33,6 +33,8 @@ describe('contractRegistry', () => {
         'Profile',
         'FilterOptions',
         'CompetitionOption',
+        'NamedPlayer',
+        'DuelNamedPlayer',
       ]),
     );
   });

@@ -12,7 +12,11 @@ import {
   matchIdentitySchema,
   matchInPlaySchema,
 } from '@/contract/match.js';
-import { duelActorSchema, duelFoundPlayerSchema } from '@/contract/player.js';
+import {
+  duelActorSchema,
+  duelFoundPlayerSchema,
+  duelNamedPlayerSchema,
+} from '@/contract/player.js';
 import { contractRegistry } from '@/contract/registry.js';
 import { guessResultSchema, roundTimingSchema } from '@/contract/round.js';
 
@@ -123,7 +127,8 @@ export const duelResultSchema = z
   .object({
     outcome: duelOutcomeSchema,
     match: matchIdentitySchema,
-    found: sharedFoundSchema,
+    // In the order named
+    found: z.array(duelNamedPlayerSchema).max(SQUAD_SIZE),
     you: duelPlayerSchema,
     opponent: duelPlayerSchema,
     isForfeit: z.boolean(),

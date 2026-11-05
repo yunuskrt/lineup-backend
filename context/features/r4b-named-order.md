@@ -2,7 +2,7 @@
 
 ## Status
 
-Not Started
+Complete
 
 ## Goals
 
@@ -49,7 +49,7 @@ Not Started
 
 ## Decisions
 
-Proposed:
+Approved at `/feature load` (2026-11-06), all three as proposed:
 
 - **D1. Two new schemas, `NamedPlayer` and `DuelNamedPlayer`,** rather than new fields on `RevealedPlayer` and `DuelFoundPlayer`. Those two are shared with live payloads (`SoloSession.found`, `DuelSession.found`, `playerRevealed`) and with `missed`, which must not gain them
   - Alternative: optional fields on the shared schemas. That leaves a field present in some payloads and absent in others under one name
@@ -89,5 +89,24 @@ Proposed:
   - `/docs/openapi.json`: `NamedPlayer` and `DuelNamedPlayer` listed; `SoloSummary.found` and `DuelResult.found` reference them
   - on `dev`: one solo run with two names, then quit; report the summary's orders and that each time is in 0–15000. Counts and numbers only, never a name
 - Afterwards, in the web: mark R4 Part 2 done in `backend-requests.md`; Gameplay Visuals C transcribes `NamedPlayer` and `DuelNamedPlayer`
+
+**Deviations recorded during implementation**
+
+- Added: a second pure helper, `timedFound(found, named)` in `src/game/summary.ts`. Both views share it, so D2's cross-check (a found player with no timing, or a timing with no found player, throws) lives in one unit-tested function, not two copies
+- `toDuelResult`'s new `effects` argument sits before the optional `moment`, so the signature is `(room, result, receiver, effects, moment?)`
+- `duel-events.spec.ts`'s `step` helper now appends each step's effects to `room.effects`, as `DuelPlayService.apply` does. It only updated `timed` before, so its rooms had no stream and D2's check rightly threw
+- Added: `soloSummarySchema` bounds cases in `src/contract/solo.spec.ts` (order 0 and 12, a time past 15 000 or below 0, no timing)
+- Added at `/feature review`, on the user's call (2026-11-06): `DuelPlayService.apply` builds its events through a new `eventsOf`, which catches a throw, logs the room id and error kind only, and sends both players an `error` (`server_error`) instead. D2's new throw can run from the round timer, where nothing catches it and Node would stop the process. 3 unit tests cover the timer, the log and a forfeit; all three fail without the fix
+
+**Test results (2026-11-06)**
+
+- `npm test` 1168 passed (+24, including the 3 failure-path tests); lint, build and `npx tsc --noEmit` clean
+- `npm run test:e2e` on `dev` (`ASSET_BASE_URL` unset): 450 passed (449 + the two-name solo case); the four `DuelHarness` whole games pass with the order check on both players
+- `/docs/openapi.json`: `NamedPlayer` and `DuelNamedPlayer` listed; `SoloSummary.found` refs `NamedPlayer`, `DuelResult.found` refs `DuelNamedPlayer`; `SoloSession.found` still refs `RevealedPlayer`
+- Live on `dev`, as a guest: two correct guesses (`correct_new` both), then quit
+  - summary `found`: 2 players, orders 1 and 2, times 1324 and 1333 ms, both in 0–15000
+  - `missed` (free tier: `null`) carries no timing
+  - the quit run was saved to `dev` as usual (B34), with its guest user
+- No further unit tests: every new function is covered, including the failure path
 
 ## History

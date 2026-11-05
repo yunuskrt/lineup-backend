@@ -28,6 +28,7 @@ export function eventsFor(
   effects: readonly TimedEffect[],
 ): Outbound[] {
   let moment: Moment = momentOf(before);
+  const stream = [...before.effects, ...effects];
   const out: Outbound[] = [];
   const toBoth = (build: (seat: Seat) => Outbound) => {
     for (const seat of SEATS) out.push(build(seat));
@@ -90,7 +91,7 @@ export function eventsFor(
         toBoth((seat) => ({
           seat,
           event: 'finished',
-          payload: toDuelResult(before, effect.result, seat, at),
+          payload: toDuelResult(before, effect.result, seat, stream, at),
         }));
         break;
       }

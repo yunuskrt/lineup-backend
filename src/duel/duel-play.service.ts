@@ -1,5 +1,10 @@
-import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common';
-import { ApiException } from '@/common/api-exception.js';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleDestroy,
+} from '@nestjs/common';
+import { ApiException, SERVER_ERROR_MESSAGE } from '@/common/api-exception.js';
 import { CLOCK, type Clock } from '@/common/clock.js';
 import type { User } from '@/contract/auth.js';
 import type { ConnectionStatus, DuelGuessRequest } from '@/contract/duel.js';
@@ -12,7 +17,7 @@ import {
   type TimedStep,
 } from '@/game/timed-game.js';
 import { DUEL_PLAY_MESSAGES } from '@/duel/duel-messages.js';
-import { eventsFor } from '@/duel/duel-events.js';
+import { eventsFor, type Outbound } from '@/duel/duel-events.js';
 import { DuelNotifier } from '@/duel/duel-notifier.js';
 import { DuelPersistenceService } from '@/duel/duel-persistence.service.js';
 import {
@@ -46,6 +51,7 @@ export function playRejection(rejected: TimedRejection): ApiException {
 // From round 1 to finished
 @Injectable()
 export class DuelPlayService implements OnModuleDestroy {
+  private readonly logger = new Logger('DuelPlay');
   private readonly timers = new Map<string, NodeJS.Timeout>();
   // One reconnect window per away seat
   private readonly windows = new Map<string, NodeJS.Timeout>();
@@ -197,10 +203,27 @@ export class DuelPlayService implements OnModuleDestroy {
       this.rooms.save(next);
       this.arm(next);
     }
-    for (const { seat, event, payload } of eventsFor(room, step.effects)) {
+    for (const { seat, event, payload } of this.eventsOf(room, step)) {
       this.notifier.toUser(room.players[seat].id, event, payload);
     }
     return step;
+  }
+
+  // A timer has no catcher: a throw here would crash
+  private eventsOf(room: PlayingRoom, step: TimedStep): Outbound[] {
+    try {
+      return eventsFor(room, step.effects);
+    } catch (error) {
+      // The room only: never a player or the squad
+      const kind = error instanceof Error ? error.name : typeof error;
+      this.logger.error(`Duel events failed for room ${room.id} (${kind})`);
+      const failed = new ApiException('server_error', SERVER_ERROR_MESSAGE);
+      return room.players.map((_, seat) => ({
+        seat: seat as Seat,
+        event: 'error',
+        payload: failed.error,
+      }));
+    }
   }
 
   // One timer per room, at the next deadline

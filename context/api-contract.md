@@ -141,6 +141,13 @@ Every `MatchIdentity` field, **plus**:
 
 `DuelFoundPlayer` = `RevealedPlayer` + `foundBy: DuelActor`.
 
+`NamedPlayer` = `RevealedPlayer` + the two fields below (R4b). `DuelNamedPlayer` = `DuelFoundPlayer` + the same two. **End-of-game only**: in `SoloSummary.found` and `DuelResult.found`, never in a live payload.
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `order` | integer 1–11 | When this player was named in the session; 1 is the first. Unique, no gaps. The list is sorted by it |
+| `elapsedMs` | integer 0–15 000 | Server receipt of the correct guess minus the start of its round, capped at the round length (a guess in the grace window reads 15 000). In a duel, the finder's own turn |
+
 ### `RoundTiming`
 
 | Field | Type | Rule |
@@ -267,7 +274,7 @@ The `Filters` request is unchanged: `competitionIds` is still an array, and any 
 | Field | Type | Rule |
 | --- | --- | --- |
 | `match` | `MatchIdentity` | |
-| `found` | `RevealedPlayer[]` | ≤ 11 |
+| `found` | `NamedPlayer[]` | ≤ 11, in the order named (R4b) |
 | `missedCount` | integer 0–11 | |
 | `missed` | `RevealedPlayer[]` or `null` | **Pro gets the list, free gets `null`.** The server decides. |
 | `livesRemaining` | 0–3 | |
@@ -401,7 +408,7 @@ Every command is acked with the §2 envelope, `data` empty. **Outcomes arrive as
 | --- | --- |
 | `outcome` | `DuelOutcome` (receiver's view) |
 | `match` | `MatchIdentity` |
-| `found` | `DuelFoundPlayer[]` |
+| `found` | `DuelNamedPlayer[]`, in the order named (R4b) |
 | `you` | `DuelPlayer` |
 | `opponent` | `DuelPlayer` |
 | `isForfeit` | boolean |

@@ -13,7 +13,7 @@ import {
   matchIdentitySchema,
   matchInPlaySchema,
 } from '@/contract/match.js';
-import { revealedPlayerSchema } from '@/contract/player.js';
+import { namedPlayerSchema, revealedPlayerSchema } from '@/contract/player.js';
 import { contractRegistry } from '@/contract/registry.js';
 import { guessResultSchema, roundTimingSchema } from '@/contract/round.js';
 
@@ -82,7 +82,8 @@ export type SoloGuessResponse = z.infer<typeof soloGuessResponseSchema>;
 export const soloSummarySchema = z
   .object({
     match: matchIdentitySchema,
-    found: foundPlayersSchema,
+    // In the order named
+    found: z.array(namedPlayerSchema).max(SQUAD_SIZE),
     missedCount: squadCountSchema,
     // Pro gets the list, free gets null
     missed: foundPlayersSchema.nullable(),

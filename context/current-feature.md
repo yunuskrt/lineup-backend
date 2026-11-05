@@ -58,3 +58,4 @@ Not Started
 - R3a Competition Filter Options: CompetitionOption clubIds, seasonStarts
 - R3b Competition Logos: nullable logo_key, CompetitionRef.logoUrl or null
 - R4a Solo Offer Match: SoloMatchOffer.match, home/away kept, deprecated
+- R4b Named Order: order + elapsedMs on summary/result, duel events guard

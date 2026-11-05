@@ -100,7 +100,12 @@ export class SoloService {
       effects: [],
     };
     this.store.save(run);
-    return { sessionId: run.id, home: match.home, away: match.away };
+    return {
+      sessionId: run.id,
+      match,
+      home: match.home,
+      away: match.away,
+    };
   }
 
   async chooseSide(

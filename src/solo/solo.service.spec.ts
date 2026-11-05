@@ -3,6 +3,7 @@ import type { Clock } from '@/common/clock.js';
 import type { Env } from '@/config/env.schema.js';
 import type { User } from '@/contract/auth.js';
 import type { Filters } from '@/contract/match.js';
+import { soloMatchOfferSchema } from '@/contract/solo.js';
 import type { MatchSelectorService } from '@/matches/match-selector.service.js';
 import type { SquadLoaderService } from '@/matches/squad-loader.service.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
@@ -110,6 +111,18 @@ describe('SoloService', () => {
         side: null,
         touchedAt: T0,
       });
+    });
+
+    it("carries the run's match, with no side or formation", async () => {
+      const { service, store } = setup();
+      const offer = await service.start(user(), FILTERS);
+
+      expect(offer.match).toEqual(store.get(offer.sessionId, 'user-1')?.match);
+      expect(offer.match.home).toEqual(offer.home);
+      expect(offer.match.away).toEqual(offer.away);
+      expect(offer.match).not.toHaveProperty('side');
+      expect(offer.match).not.toHaveProperty('formation');
+      expect(soloMatchOfferSchema.parse(offer)).toEqual(offer);
     });
 
     it('refuses an empty pool, naming the filter to blame', async () => {

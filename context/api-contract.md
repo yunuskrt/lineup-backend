@@ -237,11 +237,12 @@ The `Filters` request is unchanged: `competitionIds` is still an array, and any 
 
 **`SoloMatchOffer`.** The run is created and the player picks a side next.
 
-| Field | Type |
-| --- | --- |
-| `sessionId` | id |
-| `home` | `ClubRef` |
-| `away` | `ClubRef` |
+| Field | Type | Rule |
+| --- | --- | --- |
+| `sessionId` | id | |
+| `match` | `MatchIdentity` | The offered match (R4a): the same identity `SoloSession.match` carries once a side is picked, without `side` and `formation`. Never a player |
+| `home` | `ClubRef` | **Deprecated** (R4a): equals `match.home`. Kept for clients from before R4 |
+| `away` | `ClubRef` | **Deprecated** (R4a): equals `match.away`. Kept for clients from before R4 |
 
 **`SoloSession`**
 

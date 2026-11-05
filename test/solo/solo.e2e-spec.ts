@@ -142,6 +142,32 @@ describe('Solo (e2e)', () => {
     await app.close();
   });
 
+  it("offers the match, then plays it with the side's formation", async () => {
+    const cookie = await guest();
+    const offer = dataOf(
+      await http().post('/solo/sessions').set('Cookie', cookie).send(ALL),
+      soloMatchOfferSchema,
+    );
+    expect(offer.match.home).toEqual(offer.home);
+    expect(offer.match.away).toEqual(offer.away);
+    expect(offer.match).not.toHaveProperty('side');
+
+    const session = dataOf(
+      await http()
+        .post(`/solo/sessions/${offer.sessionId}/side`)
+        .set('Cookie', cookie)
+        .send({ side: 'away' }),
+      soloSessionSchema,
+    );
+    const { side, formation, ...identity } = session.match;
+    expect(side).toBe('away');
+    expect(formation).toEqual(expect.any(String));
+    expect(identity).toEqual(offer.match);
+    await http()
+      .post(`/solo/sessions/${offer.sessionId}/quit`)
+      .set('Cookie', cookie);
+  });
+
   it('refuses a request with no session', async () => {
     const res = await http().post('/solo/sessions').send(ALL);
     expect(errorOf(res, 401).code).toBe('unauthorized');

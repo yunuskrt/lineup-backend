@@ -57,3 +57,4 @@ Not Started
 - R2 Image URLs: ASSET_BASE_URL + bucket key = crestUrl, imageUrl, or null
 - R3a Competition Filter Options: CompetitionOption clubIds, seasonStarts
 - R3b Competition Logos: nullable logo_key, CompetitionRef.logoUrl or null
+- R4a Solo Offer Match: SoloMatchOffer.match, home/away kept, deprecated

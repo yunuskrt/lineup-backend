@@ -27,11 +27,19 @@ export const soloEndReasonSchema = z
   .register(contractRegistry, { id: 'SoloEndReason' });
 export type SoloEndReason = z.infer<typeof soloEndReasonSchema>;
 
+// Kept for clients from before R4a
+const legacyClubSchema = (side: 'home' | 'away') =>
+  clubRefSchema.meta({
+    deprecated: true,
+    description: `Use match.${side}`,
+  });
+
 export const soloMatchOfferSchema = z
   .object({
     sessionId: idSchema,
-    home: clubRefSchema,
-    away: clubRefSchema,
+    match: matchIdentitySchema,
+    home: legacyClubSchema('home'),
+    away: legacyClubSchema('away'),
   })
   .register(contractRegistry, { id: 'SoloMatchOffer' });
 export type SoloMatchOffer = z.infer<typeof soloMatchOfferSchema>;

@@ -8,7 +8,9 @@ export function corsOptions(env: Env): CorsOptions {
     origin: [env.WEB_APP_URL],
     credentials: true,
     methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    // If-None-Match and ETag: directory revalidation
+    allowedHeaders: ['Content-Type', 'Authorization', 'If-None-Match'],
+    exposedHeaders: ['ETag'],
     maxAge: 600,
   };
 }

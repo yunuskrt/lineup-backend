@@ -17,6 +17,21 @@ describe('revealedPlayerSchema', () => {
     ).toBe(false);
   });
 
+  it('requires a 22-character directory key', () => {
+    const { directoryKey: _, ...keyless } = revealedPlayer;
+    expect(revealedPlayerSchema.safeParse(keyless).success).toBe(false);
+    for (const directoryKey of [
+      'short',
+      'A'.repeat(23),
+      'A'.repeat(21) + '/',
+    ]) {
+      expect(
+        revealedPlayerSchema.safeParse({ ...revealedPlayer, directoryKey })
+          .success,
+      ).toBe(false);
+    }
+  });
+
   it('requires foundBy on a duel player', () => {
     expect(duelFoundPlayerSchema.safeParse(revealedPlayer).success).toBe(false);
     expect(

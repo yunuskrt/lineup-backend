@@ -1,11 +1,16 @@
 import type { Env } from '@/config/env.schema.js';
 import { normalizeName } from '@/game/normalize.js';
+import { PlayerKeysService } from '@/matches/player-keys.service.js';
 import { SquadLoaderService } from '@/matches/squad-loader.service.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
 import { type Tx, useRolledBackDb } from '@test/schema/schema-test-utils.js';
 
+const KEYS = new PlayerKeysService({
+  BETTER_AUTH_SECRET: 'k'.repeat(32),
+} as Env);
+
 const loader = (tx: Tx) =>
-  new SquadLoaderService(tx as unknown as PrismaService, {} as Env);
+  new SquadLoaderService(tx as unknown as PrismaService, {} as Env, KEYS);
 
 // Any seeded match with both XIs complete
 async function seededMatchId(tx: Tx): Promise<string> {

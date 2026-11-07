@@ -35,6 +35,8 @@ describe('contractRegistry', () => {
         'CompetitionOption',
         'NamedPlayer',
         'DuelNamedPlayer',
+        'DirectoryPlayer',
+        'PlayerDirectory',
       ]),
     );
   });

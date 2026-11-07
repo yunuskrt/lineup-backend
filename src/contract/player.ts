@@ -12,6 +12,11 @@ export const duelActorSchema = z
   .register(contractRegistry, { id: 'DuelActor' });
 export type DuelActor = z.infer<typeof duelActorSchema>;
 
+// Opaque per-player key; never the real id (R5)
+export const directoryKeySchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{22}$/, 'A directory key');
+
 export const revealedPlayerSchema = z
   .object({
     id: idSchema,
@@ -23,6 +28,8 @@ export const revealedPlayerSchema = z
       .max(SQUAD_SIZE - 1),
     position: positionGroupSchema,
     imageUrl: imageUrlSchema.nullable(),
+    // Equals this player's DirectoryPlayer.key
+    directoryKey: directoryKeySchema,
   })
   .register(contractRegistry, { id: 'RevealedPlayer' });
 export type RevealedPlayer = z.infer<typeof revealedPlayerSchema>;

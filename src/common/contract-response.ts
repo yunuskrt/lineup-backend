@@ -9,7 +9,11 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ApiOkResponse, type ApiResponseOptions } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiResponse,
+  type ApiResponseOptions,
+} from '@nestjs/swagger';
 import { map, type Observable } from 'rxjs';
 import { z } from 'zod';
 import { ApiException, SERVER_ERROR_MESSAGE } from '@/common/api-exception.js';
@@ -59,6 +63,24 @@ export function ContractResponse(
   );
 }
 
+const SendsOwnBody = Reflector.createDecorator<z.ZodType>();
+
+// Writes its own pre-checked envelope bytes (R5)
+export function DirectResponse(
+  schema: z.ZodType,
+  { headers }: { headers?: ResponseHeaders } = {},
+) {
+  return applyDecorators(
+    SendsOwnBody(schema),
+    ApiOkResponse({ schema: successDoc(schema), headers }),
+    ApiResponse({
+      status: HttpStatus.NOT_MODIFIED,
+      description: 'If-None-Match equals the current ETag; no body',
+      headers,
+    }),
+  );
+}
+
 @Injectable()
 export class ContractResponseInterceptor implements NestInterceptor {
   private readonly logger = new Logger('ContractResponse');
@@ -69,6 +91,10 @@ export class ContractResponseInterceptor implements NestInterceptor {
     if (context.getType() !== 'http') return next.handle();
 
     const route = `${context.getClass().name}.${context.getHandler().name}`;
+    // Checked at build time, sent by the handler
+    if (this.reflector.get(SendsOwnBody, context.getHandler())) {
+      return next.handle();
+    }
     const schema = this.reflector.get(ResponseSchema, context.getHandler());
     // Fail closed: an undeclared shape could leak
     if (!schema) {

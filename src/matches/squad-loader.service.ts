@@ -8,6 +8,7 @@ import { positionForSlot } from '@/game/formation.js';
 import type { SquadEntry } from '@/game/matcher.js';
 import type { Prisma } from '@/generated/prisma/client.js';
 import { assetUrl } from '@/matches/asset-url.js';
+import { PlayerKeysService } from '@/matches/player-keys.service.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 
 // Server-only: the answer key (HC 2)
@@ -48,6 +49,7 @@ function toLoadedSquad(
   side: Side,
   team: TeamRow | null,
   assetBase: string | undefined,
+  keyOf: (playerId: string) => string,
 ): LoadedSquad {
   const formation = team?.formation;
   if (!team || !formation) throw unplayable(matchId, side, 'has no formation');
@@ -77,6 +79,7 @@ function toLoadedSquad(
       slot,
       position,
       imageUrl: assetUrl(assetBase, player.imageKey),
+      directoryKey: keyOf(player.id),
     })),
   };
 }
@@ -86,6 +89,7 @@ export class SquadLoaderService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(ENV) private readonly env: Env,
+    private readonly keys: PlayerKeysService,
   ) {}
 
   async load(matchId: string, side: Side): Promise<LoadedSquad> {
@@ -93,6 +97,8 @@ export class SquadLoaderService {
       where: { matchId_side: { matchId, side } },
       select: SQUAD_SELECT,
     });
-    return toLoadedSquad(matchId, side, team, this.env.ASSET_BASE_URL);
+    return toLoadedSquad(matchId, side, team, this.env.ASSET_BASE_URL, (id) =>
+      this.keys.keyOf(id),
+    );
   }
 }

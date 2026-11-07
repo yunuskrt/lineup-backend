@@ -35,6 +35,7 @@ export const SQUAD: LoadedSquad = {
     slot,
     position: POSITIONS[slot],
     imageUrl: null,
+    directoryKey: `key-${name}`.padEnd(22, 'x'),
   })),
 };
 

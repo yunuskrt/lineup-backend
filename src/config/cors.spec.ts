@@ -9,12 +9,13 @@ describe('corsOptions', () => {
       origin: ['https://app.lineup.gg'],
       credentials: true,
       methods: ['GET', 'POST'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'If-None-Match'],
+      exposedHeaders: ['ETag'],
       maxAge: 600,
     });
   });
 
-  it('exposes no response headers', () => {
-    expect(corsOptions(env)).not.toHaveProperty('exposedHeaders');
+  it('exposes only the directory ETag', () => {
+    expect(corsOptions(env).exposedHeaders).toEqual(['ETag']);
   });
 });

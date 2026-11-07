@@ -34,6 +34,7 @@ export const revealedPlayer: RevealedPlayer = {
   slot: 0,
   position: 'GK',
   imageUrl: null,
+  directoryKey: 'AbCdEfGhIjKlMnOpQrStUv',
 };
 
 export const duelFoundPlayer: DuelFoundPlayer = {

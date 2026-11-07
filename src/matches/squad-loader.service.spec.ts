@@ -1,5 +1,6 @@
 import type { Env } from '@/config/env.schema.js';
 import type { PositionGroup } from '@/contract/common.js';
+import { PlayerKeysService } from '@/matches/player-keys.service.js';
 import { SquadLoaderService } from '@/matches/squad-loader.service.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
 
@@ -40,6 +41,9 @@ const team = (overrides: object = {}) => ({
 });
 
 const BASE = 'https://bucket.example.com/images';
+const KEYS = new PlayerKeysService({
+  BETTER_AUTH_SECRET: 'k'.repeat(32),
+} as Env);
 
 function loaderWith(row: unknown, assetBase?: string) {
   const findUnique = vi.fn().mockResolvedValue(row);
@@ -47,6 +51,7 @@ function loaderWith(row: unknown, assetBase?: string) {
   const loader = new SquadLoaderService(
     prisma as unknown as PrismaService,
     { ASSET_BASE_URL: assetBase } as Env,
+    KEYS,
   );
   return { findUnique, loader };
 }
@@ -85,7 +90,16 @@ describe('SquadLoaderService', () => {
       slot: 0,
       position: 'GK',
       imageUrl: null,
+      directoryKey: KEYS.keyOf('p-0'),
     });
+  });
+
+  it('gives each reveal the directory key of its player', async () => {
+    const squad = await loaderWith(team()).loader.load('m-1', 'home');
+    for (const player of squad.players) {
+      expect(player.directoryKey).toBe(KEYS.keyOf(player.id));
+      expect(player.directoryKey).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    }
   });
 
   it('sends no photo URL without a base', async () => {

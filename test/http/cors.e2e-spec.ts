@@ -67,7 +67,7 @@ describe('CORS and origin check (e2e)', () => {
   });
 
   describe('preflight', () => {
-    it('allows the web app, with credentials and the two headers', async () => {
+    it('allows the web app, with credentials and its three headers', async () => {
       const res = await preflight('/auth/sign-in', web);
 
       expect(res.status).toBe(204);
@@ -75,7 +75,8 @@ describe('CORS and origin check (e2e)', () => {
         'access-control-allow-origin': web,
         'access-control-allow-credentials': 'true',
         'access-control-allow-methods': 'GET,POST',
-        'access-control-allow-headers': 'Content-Type,Authorization',
+        'access-control-allow-headers':
+          'Content-Type,Authorization,If-None-Match',
         'access-control-max-age': '600',
       });
     });
@@ -90,7 +91,7 @@ describe('CORS and origin check (e2e)', () => {
       const res = await preflight('/auth/sign-in', web, 'x-anything');
 
       expect(res.headers['access-control-allow-headers']).toBe(
-        'Content-Type,Authorization',
+        'Content-Type,Authorization,If-None-Match',
       );
     });
 
@@ -109,7 +110,8 @@ describe('CORS and origin check (e2e)', () => {
     expect(res.headers['access-control-allow-origin']).toBe(web);
     expect(res.headers['access-control-allow-credentials']).toBe('true');
     expect(res.headers.vary).toMatch(/Origin/);
-    expect(res.headers['access-control-expose-headers']).toBeUndefined();
+    // Only the directory ETag is readable (R5)
+    expect(res.headers['access-control-expose-headers']).toBe('ETag');
   });
 
   describe('origin check', () => {

@@ -59,3 +59,4 @@ Not Started
 - R3b Competition Logos: nullable logo_key, CompetitionRef.logoUrl or null
 - R4a Solo Offer Match: SoloMatchOffer.match, home/away kept, deprecated
 - R4b Named Order: order + elapsedMs on summary/result, duel events guard
+- R5 Player Directory: GET /catalog/players, opaque keys, ETag 304, br/gzip

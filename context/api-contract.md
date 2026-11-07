@@ -138,6 +138,7 @@ Every `MatchIdentity` field, **plus**:
 | `slot` | integer 0–10 | 0 is the goalkeeper; then the lines from defence to attack, filling right to left |
 | `position` | `PositionGroup` | Must match the slot in the formation |
 | `imageUrl` | imageUrl or `null` | |
+| `directoryKey` | string, 22 base64url characters | Equals this player's `DirectoryPlayer.key` (R5), so a client can mark named players in the directory. Opaque: it says nothing about the player |
 
 `DuelFoundPlayer` = `RevealedPlayer` + `foundBy: DuelActor`.
 
@@ -207,6 +208,7 @@ Paths are suggestions. Every response body is the envelope from §2, wrapping th
 | 13 | `solo.getSummary` | `GET /solo/sessions/:sessionId/summary` | — | `SoloSummary` |
 | 14 | `profile.getProfile` | `GET /profile` | — | `Profile` |
 | 15 | `profile.getHistory` | `GET /profile/history?cursor=&limit=` | `HistoryQuery` | `HistoryPage` |
+| 16 | `catalog.getPlayerDirectory` | `GET /catalog/players` | — | `PlayerDirectory` (R5), or `304` with no body |
 
 Better Auth (B10) mounts its own routes. Calls 1–6 may map onto them rather than onto these paths; the web only needs the shapes.
 
@@ -241,6 +243,28 @@ The web only checks password **length**. The backend owns the password policy.
 | `seasonStarts` | integer[] | Season start years of its pool matches. Ascending, no repeats, never empty, each inside `era` |
 
 The `Filters` request is unchanged: `competitionIds` is still an array, and any number of ids is accepted.
+
+**`PlayerDirectory`** (R5) = `{ players: DirectoryPlayer[] }`. **Every** player with at least one alias, sorted by `key`. Never scoped to a match, a filter, the pool or a session, so the 11 answers sit among the rest unmarked (HC 2). For guess suggestions only: the client still sends the typed or picked text as a guess, and the server decides.
+
+**`DirectoryPlayer`**
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `key` | string, 22 base64url characters | Opaque and stable. **Not** `players.id`: those are uuid(7), and their creation order groups teammates. A revealed player's `directoryKey` equals it |
+| `name` | string | Non-empty, display form, diacritics kept |
+| `imageUrl` | imageUrl or `null` | As `RevealedPlayer.imageUrl` |
+| `terms` | string[] | The player's distinct normalised aliases, sorted, at least one. For searching; never shown |
+
+**Caching `GET /catalog/players`.** Any session may call it, guests included; with no session it's `401 unauthorized`. Rate-limited with the `catalog` limit (60 a minute).
+
+| Header | Value |
+| --- | --- |
+| `ETag` | A strong tag. It changes only when a player or alias the directory reads is added, edited or deleted, or when the server's asset base or key changes |
+| `Cache-Control` | `private, no-cache`: the browser keeps the copy and asks before reusing it |
+| `If-None-Match` (request) | Equal to the current `ETag` (or `*`) → `304 Not Modified`, no body |
+| `Content-Encoding` | `br` when accepted, else `gzip`, else none. `Vary: Accept-Encoding` |
+
+CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate through the browser cache or by hand.
 
 **`SoloMatchOffer`.** The run is created and the player picks a side next.
 
@@ -319,6 +343,7 @@ The `Filters` request is unchanged: `competitionIds` is still an array, and any 
 | `syncSession`, `quit` | `not_found`, `invalid_input` (no side chosen yet) |
 | `getSummary` | `not_found`, `invalid_input`, `forbidden` (run still in progress) |
 | `getProfile`, `getHistory` | `unauthorized`; `getHistory` also `invalid_input` |
+| `getPlayerDirectory` | `unauthorized`, `rate_limited` + `retryAfterMs` |
 | Any | `server_error` |
 
 ### Solo behaviour the web relies on

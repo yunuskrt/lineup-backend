@@ -32,6 +32,8 @@ export type FinishedDuel = {
   readonly effects: readonly TimedEffect[];
   readonly lives: readonly number[];
   readonly outcomes: readonly [DuelOutcome, DuelOutcome];
+  // From a private room (R6)
+  readonly isPrivate: boolean;
 };
 
 export function finishedDuel(room: PlayingRoom): FinishedDuel {
@@ -46,6 +48,7 @@ export function finishedDuel(room: PlayingRoom): FinishedDuel {
     effects: room.effects,
     lives: room.timed.game.lives,
     outcomes: result.outcomes,
+    isPrivate: room.origin === 'room',
   };
 }
 
@@ -59,6 +62,7 @@ async function write(tx: Prisma.TransactionClient, duel: FinishedDuel) {
       id: duel.id,
       mode: 'duel',
       status: 'over',
+      isPrivate: duel.isPrivate,
       matchId: duel.matchId,
       side: duel.side,
       startedAt: new Date(duel.firstRound.startedAt),

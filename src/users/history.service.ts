@@ -28,6 +28,7 @@ const ENTRY_SELECT = {
       mode: true,
       endedAt: true,
       soloEndReason: true,
+      isPrivate: true,
       match: { select: MATCH_IDENTITY_SELECT },
     },
   },
@@ -137,7 +138,12 @@ function toEntry(
     return { ...base, mode: 'solo', outcome: session.soloEndReason };
   }
   if (session.mode === 'duel' && row.duelOutcome) {
-    return { ...base, mode: 'duel', outcome: row.duelOutcome };
+    return {
+      ...base,
+      mode: 'duel',
+      outcome: row.duelOutcome,
+      isPrivate: session.isPrivate,
+    };
   }
   throw new Error(`Session ${row.sessionId} has no outcome`);
 }

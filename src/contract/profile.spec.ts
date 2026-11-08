@@ -38,9 +38,27 @@ describe('historyEntrySchema', () => {
       }).success,
     ).toBe(true);
     expect(
+      historyEntrySchema.safeParse({
+        ...entry,
+        mode: 'duel',
+        outcome: 'draw',
+        isPrivate: false,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('requires isPrivate on a duel entry, and strips it from solo', () => {
+    expect(
       historyEntrySchema.safeParse({ ...entry, mode: 'duel', outcome: 'draw' })
         .success,
-    ).toBe(true);
+    ).toBe(false);
+    const solo = historyEntrySchema.parse({
+      ...entry,
+      mode: 'solo',
+      outcome: 'quit',
+      isPrivate: true,
+    });
+    expect(solo).not.toHaveProperty('isPrivate');
   });
 
   it('rejects an outcome from the other mode', () => {

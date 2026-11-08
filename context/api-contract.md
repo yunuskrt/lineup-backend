@@ -329,6 +329,7 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | `livesRemaining` | 0–3 |
 | `mode` | `solo` or `duel` |
 | `outcome` | `SoloEndReason` when `mode: solo`; `DuelOutcome` when `mode: duel` |
+| `isPrivate` | boolean, **duel entries only** (R6): `true` when the duel was played in a private room. Solo entries have no such field |
 
 ### Errors the web handles, per call
 

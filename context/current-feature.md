@@ -61,3 +61,4 @@ Not Started
 - R4b Named Order: order + elapsedMs on summary/result, duel events guard
 - R5 Player Directory: GET /catalog/players, opaque keys, ETag 304, br/gzip
 - R6a Private Rooms: room:create/join/leave, 6-char code, 10 min, source room
+- R6b Room History: is_private on game_sessions, HistoryEntry.isPrivate

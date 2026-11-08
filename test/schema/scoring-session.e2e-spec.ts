@@ -301,6 +301,22 @@ describe('Scoring & session schema (e2e)', () => {
       );
     });
 
+    it('starts every session as not private', async () => {
+      const session = await end('duel', {});
+      expect(session.isPrivate).toBe(false);
+    });
+
+    it('lets a duel be private (R6)', async () => {
+      const session = await end('duel', { isPrivate: true });
+      expect(session.isPrivate).toBe(true);
+    });
+
+    it('rejects a private solo run', async () => {
+      await expect(end('solo', { isPrivate: true })).rejects.toThrow(
+        'game_sessions_is_private_check',
+      );
+    });
+
     it('lets a solo run wait for its side', async () => {
       const session = await end('solo', { side: null });
       expect(session.side).toBeNull();

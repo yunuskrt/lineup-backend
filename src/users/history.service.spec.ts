@@ -50,11 +50,17 @@ const solo = (n: number, extra: object = {}) => ({
   ...extra,
 });
 
-const duel = (n: number) => ({
+const duel = (n: number, isPrivate = false) => ({
   sessionId: sessionId(n),
   livesRemaining: 0,
   duelOutcome: 'loss',
-  session: { mode: 'duel', endedAt: ENDED, soloEndReason: null, match: MATCH },
+  session: {
+    mode: 'duel',
+    endedAt: ENDED,
+    soloEndReason: null,
+    isPrivate,
+    match: MATCH,
+  },
 });
 
 const rounds = (n: number, ...found: number[]) =>
@@ -119,11 +125,27 @@ describe('HistoryService', () => {
         outcome: 'lives_out',
         livesRemaining: 2,
       },
-      { id: sessionId(1), mode: 'duel', outcome: 'loss', livesRemaining: 0 },
+      {
+        id: sessionId(1),
+        mode: 'duel',
+        outcome: 'loss',
+        livesRemaining: 0,
+        isPrivate: false,
+      },
     ]);
+    expect(page.entries[0]).not.toHaveProperty('isPrivate');
     expect(page.entries[0].playedAt).toBe('2026-10-01T12:00:00.000Z');
     expect(page.entries[0].match.score).toEqual({ home: 3, away: 3 });
     expect(historyPageSchema.parse(page)).toEqual(page);
+  });
+
+  it('marks a private-room duel on its entry', async () => {
+    prisma.gameParticipant.findMany.mockResolvedValue([duel(2, true), duel(1)]);
+    const page = await service.historyOf(USER_ID, { limit: 20 });
+    expect(page.entries.map((e) => e.mode === 'duel' && e.isPrivate)).toEqual([
+      true,
+      false,
+    ]);
   });
 
   it("sums each session's correct_new guesses, in one query", async () => {

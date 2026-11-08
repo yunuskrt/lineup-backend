@@ -240,6 +240,7 @@ describe('Profile history (e2e)', () => {
           livesRemaining: 2,
           mode: 'duel',
           outcome: 'win',
+          isPrivate: false,
         },
         {
           id: soloId,

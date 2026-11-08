@@ -316,6 +316,8 @@ model GameSession {
   startedAt     DateTime       @default(now()) @map("started_at")
   endedAt       DateTime?      @map("ended_at")
   soloEndReason SoloEndReason? @map("solo_end_reason")
+  // A private-room duel (R6); never a solo run
+  isPrivate     Boolean        @default(false) @map("is_private")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 

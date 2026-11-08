@@ -164,12 +164,30 @@ describe('Duel harness: four whole games (e2e)', () => {
     await new Promise((resolve) => setTimeout(resolve, QUIET_MS));
   }
 
-  async function outcomeIn(client: Client, sessionId: string) {
+  async function entryIn(client: Client, sessionId: string) {
     const res = await request(h.server)
       .get('/profile/history')
       .set('Cookie', client.cookie);
     const { entries } = historyPageSchema.parse(res.body.data);
-    return entries.find((entry) => entry.id === sessionId)?.outcome;
+    return entries.find((entry) => entry.id === sessionId);
+  }
+
+  const outcomeIn = async (client: Client, sessionId: string) =>
+    (await entryIn(client, sessionId))?.outcome;
+
+  // Both players' rows, and the saved session
+  async function expectPrivate(g: Game, isPrivate: boolean) {
+    for (const client of [g.a, g.b]) {
+      expect(await entryIn(client, g.sessionId)).toMatchObject({
+        mode: 'duel',
+        isPrivate,
+      });
+    }
+    const row = await h.prisma.gameSession.findUniqueOrThrow({
+      where: { id: g.sessionId },
+      select: { isPrivate: true },
+    });
+    expect(row.isPrivate).toBe(isPrivate);
   }
 
   async function expectHistory(g: Game, ...clients: Client[]) {
@@ -270,6 +288,7 @@ describe('Duel harness: four whole games (e2e)', () => {
     expectMirroredResults(aResult, bResult);
     expectContract(g);
     await expectHistory(g, g.a, g.b);
+    await expectPrivate(g, false);
   });
 
   it('plays a private room game: the joiner names first, to a draw', async () => {
@@ -302,6 +321,7 @@ describe('Duel harness: four whole games (e2e)', () => {
     expectMirroredResults(aResult, bResult);
     expectContract(g);
     await expectHistory(g, g.a, g.b);
+    await expectPrivate(g, true);
     // Counted like any duel: fresh guests, one draw
     for (const client of [g.a, g.b]) {
       const res = await request(h.server)

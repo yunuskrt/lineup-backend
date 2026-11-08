@@ -2,7 +2,7 @@
 
 ## Status
 
-Not Started
+Complete
 
 ## Goals
 
@@ -67,5 +67,21 @@ Decided 2026-11-08, before load:
   - `/docs/openapi.json`: the duel `HistoryEntry` has `isPrivate`
   - on `dev`: after the harness room game, `GET /profile/history` for each player shows `isPrivate: true`. Booleans and counts only
 - Afterwards, in the web: mark R6 persistence done in `backend-requests.md` with the migration name; Private Rooms B transcribes `isPrivate`
+
+**Deviations recorded during implementation**
+
+- Migration `20261108165917_game_session_is_private`: the generated `ADD COLUMN` plus the hand-written `game_sessions_is_private_check`, as planned. Applied to `dev` (`migrate dev`) and to `ingest` (`migrate deploy`, its direct host from the Neon MCP, passed only as an environment variable). Both branches checked afterwards: the column is `NOT NULL DEFAULT false`, the CHECK exists, and no row is private. Prisma 7's `migrate dev` no longer regenerates the client, so `npm run db:generate` ran after it
+- `context/docs/scraper-data-contract.md` is unchanged: it names `game_sessions` among the gameplay tables but lists none of its columns
+- `test/users/history.e2e-spec.ts`'s exact duel entry gained `isPrivate: false`, the one existing test that pinned the entry's shape
+- The harness checks sit in `test/duel/duel-harness.e2e-spec.ts`: a new `expectPrivate` reads both players' history rows and the saved session row, `true` for the room game and `false` for the queue draw
+
+**Test results (2026-11-08)**
+
+- `npm test` 1277 passed (+3 from R6b, beside the updated ones); lint, build and `npx tsc --noEmit` clean
+- No further unit tests: every R6b change is covered (the save for both origins, the history mapping including solo, the schema rules)
+- `npm run test:e2e` on `dev`: 464 passed (461 + 3 schema cases: the default `false`, a private duel allowed, a private solo refused by `game_sessions_is_private_check`). The harness room game reads `isPrivate: true` in both players' history and in the saved session row; the queue draw reads `false`
+- One unrelated case, `test/contract.e2e-spec.ts` "refuses a route with no declared response schema", failed once in the first full run and passed on its own and in a second full run. It touches nothing R6b changed
+- `/docs/openapi.json`: `HistoryEntry`'s duel variant has `isPrivate` (`boolean`, required); the solo variant has none
+- Migration `20261108165917_game_session_is_private` recorded as finished, not rolled back, with its CHECK present, on both `dev` and `ingest`
 
 ## History

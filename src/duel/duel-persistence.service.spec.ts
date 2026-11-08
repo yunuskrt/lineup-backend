@@ -137,6 +137,20 @@ describe('DuelPersistenceService', () => {
     ]);
   });
 
+  it('flags a private-room duel, and only that', async () => {
+    expect(finishedDuel(finishedRoom()).isPrivate).toBe(false);
+    const room = { ...finishedRoom(), origin: 'room' as const };
+    expect(finishedDuel(room).isPrivate).toBe(true);
+
+    const { service, tx } = prismaWith();
+    await service.save(finishedDuel(room));
+    expect(tx.gameSession.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ mode: 'duel', isPrivate: true }),
+      }),
+    );
+  });
+
   it('keys the session by the room id, with a seat per player', async () => {
     const { service, tx } = prismaWith();
     await service.save(finishedDuel(finishedRoom()));
@@ -146,6 +160,7 @@ describe('DuelPersistenceService', () => {
         id: 'room-1',
         mode: 'duel',
         status: 'over',
+        isPrivate: false,
         matchId: 'm-1',
         side: 'home',
         startedAt: new Date(T0),

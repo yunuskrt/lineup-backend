@@ -59,6 +59,8 @@ export const historyEntrySchema = z
       ...historyEntryBase,
       mode: z.literal('duel'),
       outcome: duelOutcomeSchema,
+      // Played in a private room (R6)
+      isPrivate: z.boolean(),
     }),
   ])
   .register(contractRegistry, { id: 'HistoryEntry' });

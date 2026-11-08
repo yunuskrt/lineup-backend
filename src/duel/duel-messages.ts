@@ -5,6 +5,14 @@ export const MATCHMAKING_MESSAGES = {
   opponentLeft: 'Your opponent left.',
 } as const;
 
+export const ROOM_MESSAGES = {
+  alreadyHosting: 'You already have a room open.',
+  notHosting: "You don't have a room open.",
+  noRoom: 'No open room has that code.',
+  ownRoom: "That's your own room.",
+  hosting: 'You have a room open. Close it to join the queue.',
+} as const;
+
 // The mock's wording, which the web already shows
 export const DUEL_START_MESSAGES = {
   filtersClosed: 'Filters are not open right now.',

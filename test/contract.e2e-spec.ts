@@ -255,14 +255,23 @@ describe('Contract delivery (e2e)', () => {
       const socket = res.body['x-socket'];
       const schemas = res.body.components.schemas;
 
-      expect(Object.keys(socket.commands)).toHaveLength(5);
-      expect(Object.keys(socket.events)).toHaveLength(15);
+      expect(Object.keys(socket.commands)).toHaveLength(8);
+      expect(Object.keys(socket.events)).toHaveLength(17);
       expect(socket.commands['duel:guess']).toEqual({
         payload: { $ref: '#/components/schemas/DuelGuessRequest' },
         ack: { $ref: '#/components/schemas/EmptyResult' },
         refusals: expect.arrayContaining(['session_over', 'rate_limited']),
       });
       expect(socket.commands['queue:enter'].payload).toBeNull();
+      expect(socket.commands['room:join']).toEqual({
+        payload: { $ref: '#/components/schemas/RoomJoinRequest' },
+        ack: { $ref: '#/components/schemas/EmptyResult' },
+        refusals: expect.arrayContaining(['not_found', 'rate_limited']),
+      });
+      expect(socket.commands['room:leave'].payload).toBeNull();
+      expect(socket.events.roomCreated).toEqual({
+        $ref: '#/components/schemas/RoomState',
+      });
       expect(socket.events.finished).toEqual({
         $ref: '#/components/schemas/DuelResult',
       });

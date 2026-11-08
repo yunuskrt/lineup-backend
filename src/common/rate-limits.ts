@@ -31,6 +31,9 @@ export const SOCKET_LIMITS = {
   'duel:guess': RATE_LIMITS.guess,
   'queue:enter': { limit: 10, ttl: MINUTE },
   'filters:submit': { limit: 10, ttl: MINUTE },
+  // Tight: codes can't be found by trying (D4)
+  'room:join': { limit: 10, ttl: MINUTE },
+  'room:create': { limit: 10, ttl: MINUTE },
 } as const satisfies { default: Limit } & Partial<Record<DuelCommand, Limit>>;
 
 export function socketLimitOf(command: string): Limit {

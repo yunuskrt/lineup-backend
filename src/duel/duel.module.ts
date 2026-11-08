@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '@/auth/auth.module.js';
 import { SYSTEM_CLOCK } from '@/common/clock.js';
 import { SYSTEM_RANDOM } from '@/common/random.js';
-import { RECONNECT_WINDOW_MS } from '@/contract/constants.js';
+import { RECONNECT_WINDOW_MS, ROOM_WAIT_MS } from '@/contract/constants.js';
 import { ConnectionRegistry } from '@/duel/connection-registry.js';
 import { DuelNotifier } from '@/duel/duel-notifier.js';
 import {
@@ -25,6 +25,13 @@ import {
   MatchmakingService,
   QUEUE_TIMEOUT_MS,
 } from '@/duel/matchmaking.service.js';
+import { MatchmakingQueue } from '@/duel/matchmaking-queue.js';
+import {
+  PrivateRoomsService,
+  ROOM_CODE_PICK,
+  ROOM_WAIT,
+} from '@/duel/private-rooms.service.js';
+import { SECURE_PICK } from '@/duel/room-code.js';
 import { SocketAuthService } from '@/duel/socket-auth.service.js';
 import { SocketRateLimitGuard } from '@/duel/socket-rate-limit.guard.js';
 import { MatchesModule } from '@/matches/matches.module.js';
@@ -38,7 +45,9 @@ import { MatchesModule } from '@/matches/matches.module.js';
     ConnectionRegistry,
     DuelNotifier,
     DuelRooms,
+    MatchmakingQueue,
     MatchmakingService,
+    PrivateRoomsService,
     DuelStartService,
     DuelPlayService,
     DuelPersistenceService,
@@ -49,6 +58,8 @@ import { MatchesModule } from '@/matches/matches.module.js';
     { provide: FLIP_REVEAL_MS, useValue: DEFAULT_FLIP_REVEAL_MS },
     { provide: RECONNECT_WINDOW, useValue: RECONNECT_WINDOW_MS },
     { provide: DUEL_RETRY_MS, useValue: DEFAULT_DUEL_RETRY_MS },
+    { provide: ROOM_WAIT, useValue: ROOM_WAIT_MS },
+    { provide: ROOM_CODE_PICK, useValue: SECURE_PICK },
   ],
 })
 export class DuelModule {}

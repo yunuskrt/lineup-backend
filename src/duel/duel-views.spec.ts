@@ -24,6 +24,7 @@ const flipping: FlippingRoom = {
   id: 'room-1',
   players: PLAYERS,
   pairedAt: T0,
+  origin: 'queue',
   phase: 'flipping',
   flip: { winner: 0, filters: NO_PREFERENCE },
 };
@@ -71,11 +72,26 @@ describe('toCoinFlip', () => {
     expect(toCoinFlip(flipping, 0)).toEqual({
       winner: 'you',
       filters: NO_PREFERENCE,
+      source: 'coin',
     });
     expect(toCoinFlip(flipping, 1).winner).toBe('opponent');
     expect(
       coinFlipResultSchema.safeParse(toCoinFlip(flipping, 1)).success,
     ).toBe(true);
+  });
+
+  it("names a room's creator as winner, sourced from the room", () => {
+    const room: FlippingRoom = { ...flipping, origin: 'room' };
+    expect(toCoinFlip(room, 0)).toEqual({
+      winner: 'you',
+      filters: NO_PREFERENCE,
+      source: 'room',
+    });
+    expect(toCoinFlip(room, 1)).toEqual({
+      winner: 'opponent',
+      filters: NO_PREFERENCE,
+      source: 'room',
+    });
   });
 });
 

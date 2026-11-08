@@ -2,7 +2,7 @@ import request from 'supertest';
 import { GRACE_MS, ROUND_MS } from '@/contract/constants.js';
 import type { DuelOutcome, DuelResult, DuelSession } from '@/contract/duel.js';
 import type { DuelFoundPlayer } from '@/contract/player.js';
-import { historyPageSchema } from '@/contract/profile.js';
+import { historyPageSchema, profileSchema } from '@/contract/profile.js';
 import { DuelPersistenceService } from '@/duel/duel-persistence.service.js';
 import {
   type Client,
@@ -270,6 +270,91 @@ describe('Duel harness: four whole games (e2e)', () => {
     expectMirroredResults(aResult, bResult);
     expectContract(g);
     await expectHistory(g, g.a, g.b);
+  });
+
+  it('plays a private room game: the joiner names first, to a draw', async () => {
+    const duel = await h.pairByRoom();
+    const g: Game = { ...duel, squad: await h.squadOf(duel.match) };
+    const before = (client: Client) =>
+      client.events
+        .slice(
+          0,
+          client.events.findIndex((e) => e.event === 'matchReady'),
+        )
+        .map((e) => e.event);
+    expect(before(g.a)).toEqual(['roomCreated', 'paired', 'coinFlip']);
+    expect(before(g.b)).toEqual(['paired', 'coinFlip']);
+    const flipOf = (client: Client) =>
+      client.events.find((e) => e.event === 'coinFlip')?.payload;
+    expect(flipOf(g.a)).toMatchObject({ winner: 'you', source: 'room' });
+    expect(flipOf(g.b)).toMatchObject({ winner: 'opponent', source: 'room' });
+    const readyOf = (client: Client) =>
+      playOf(client)[0]?.payload as DuelSession;
+    expect(readyOf(g.b).turn).toBe('you');
+
+    for (const [index, name] of g.squad.names.entries()) {
+      await guess(index % 2 ? g.a : g.b, g, name);
+    }
+    await ended(g.a, g.b);
+    const [aResult, bResult] = [finishedOf(g.a), finishedOf(g.b)];
+    expect(aResult).toMatchObject({ outcome: 'draw', isForfeit: false });
+    expect(aResult.found[0]).toMatchObject({ order: 1, foundBy: 'opponent' });
+    expectMirroredResults(aResult, bResult);
+    expectContract(g);
+    await expectHistory(g, g.a, g.b);
+    // Counted like any duel: fresh guests, one draw
+    for (const client of [g.a, g.b]) {
+      const res = await request(h.server)
+        .get('/profile')
+        .set('Cookie', client.cookie);
+      expect(profileSchema.parse(res.body.data).stats).toMatchObject({
+        played: 1,
+        wins: 0,
+        losses: 0,
+        draws: 1,
+      });
+    }
+
+    // Joined once: the code is gone (D2)
+    const late = await h.client();
+    expect(await h.ack(late, 'room:join', { code: duel.code })).toMatchObject({
+      success: false,
+      error: { code: 'not_found' },
+    });
+  });
+
+  it('closes a room its creator leaves, freeing them for the queue', async () => {
+    const [a, b] = await Promise.all([h.client(), h.client()]);
+    const code = await h.createRoom(a);
+    expect(await h.ack(a, 'queue:enter')).toMatchObject({
+      success: false,
+      error: { code: 'forbidden' },
+    });
+    expect(await h.ack(a, 'room:leave')).toEqual({ success: true, data: null });
+    expect(await h.ack(b, 'room:join', { code })).toMatchObject({
+      success: false,
+      error: { code: 'not_found' },
+    });
+    expect(await h.ack(a, 'queue:enter')).toEqual({
+      success: true,
+      data: null,
+    });
+    expect(await h.ack(a, 'queue:leave')).toEqual({
+      success: true,
+      data: null,
+    });
+    expect(a.events.map((e) => e.event)).not.toContain('roomExpired');
+  });
+
+  it("closes a room at once when its creator's socket closes", async () => {
+    const [a, b] = await Promise.all([h.client(), h.client()]);
+    const code = await h.createRoom(a);
+    await h.drop(a);
+    expect(await h.ack(b, 'room:join', { code })).toMatchObject({
+      success: false,
+      error: { code: 'not_found' },
+    });
+    expect(b.events.map((e) => e.event)).not.toContain('paired');
   });
 
   it('plays a forfeit sent as a command', async () => {

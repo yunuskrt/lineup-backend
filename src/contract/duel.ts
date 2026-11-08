@@ -5,7 +5,11 @@ import {
   idSchema,
   livesSchema,
 } from '@/contract/common.js';
-import { SQUAD_SIZE } from '@/contract/constants.js';
+import {
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
+  SQUAD_SIZE,
+} from '@/contract/constants.js';
 import { type ApiErrorCode, apiErrorSchema } from '@/contract/envelope.js';
 import {
   filtersSchema,
@@ -83,14 +87,50 @@ export const filterSubmissionSchema = z
   .register(contractRegistry, { id: 'FilterSubmission' });
 export type FilterSubmission = z.infer<typeof filterSubmissionSchema>;
 
+// room: the creator's set, no toss (R6)
+export const coinFlipSourceSchema = z
+  .enum(['coin', 'room'])
+  .register(contractRegistry, { id: 'CoinFlipSource' });
+export type CoinFlipSource = z.infer<typeof coinFlipSourceSchema>;
+
 export const coinFlipResultSchema = z
   .object({
     winner: duelActorSchema,
     // Applied whole, never merged
     filters: filtersSchema,
+    source: coinFlipSourceSchema,
   })
   .register(contractRegistry, { id: 'CoinFlipResult' });
 export type CoinFlipResult = z.infer<typeof coinFlipResultSchema>;
+
+// Any case in, uppercase out
+export const roomCodeSchema = z
+  .string()
+  .toUpperCase()
+  .regex(
+    new RegExp(`^[${ROOM_CODE_ALPHABET}]{${ROOM_CODE_LENGTH}}$`),
+    'A 6-character room code',
+  );
+
+export const roomStateSchema = z
+  .object({
+    code: roomCodeSchema,
+    // As applied when the friend joins
+    filters: filtersSchema,
+    expiresAt: epochMsSchema,
+  })
+  .register(contractRegistry, { id: 'RoomState' });
+export type RoomState = z.infer<typeof roomStateSchema>;
+
+export const roomExpirySchema = z
+  .object({ code: roomCodeSchema })
+  .register(contractRegistry, { id: 'RoomExpiry' });
+export type RoomExpiry = z.infer<typeof roomExpirySchema>;
+
+export const roomJoinRequestSchema = z
+  .object({ code: roomCodeSchema })
+  .register(contractRegistry, { id: 'RoomJoinRequest' });
+export type RoomJoinRequest = z.infer<typeof roomJoinRequestSchema>;
 
 const sharedFoundSchema = z.array(duelFoundPlayerSchema).max(SQUAD_SIZE);
 
@@ -151,6 +191,9 @@ export const duelCommandSchemas = {
   'filters:submit': filtersSchema,
   'duel:guess': duelGuessRequestSchema,
   'duel:forfeit': z.undefined(),
+  'room:create': filtersSchema,
+  'room:join': roomJoinRequestSchema,
+  'room:leave': z.undefined(),
 } as const;
 export type DuelCommand = keyof typeof duelCommandSchemas;
 
@@ -180,6 +223,21 @@ export const DUEL_COMMAND_REFUSALS = {
     'rate_limited',
     'server_error',
   ],
+  'room:create': [
+    'forbidden',
+    'invalid_input',
+    'empty_pool',
+    'rate_limited',
+    'server_error',
+  ],
+  'room:join': [
+    'not_found',
+    'forbidden',
+    'invalid_input',
+    'rate_limited',
+    'server_error',
+  ],
+  'room:leave': ['forbidden', 'invalid_input', 'rate_limited', 'server_error'],
 } as const satisfies Record<DuelCommand, readonly ServerErrorCode[]>;
 
 export const duelEventSchemas = {
@@ -197,6 +255,8 @@ export const duelEventSchemas = {
   opponentConnection: connectionStateSchema,
   finished: duelResultSchema,
   disconnected: connectionStateSchema,
+  roomCreated: roomStateSchema,
+  roomExpired: roomExpirySchema,
   error: apiErrorSchema,
 } as const;
 export type DuelEventMap = {

@@ -7,6 +7,7 @@ import { nextEvent } from '@test/duel/socket-client.js';
 
 const GUESSES = SOCKET_LIMITS['duel:guess'];
 const ENTERS = SOCKET_LIMITS['queue:enter'];
+const JOINS = SOCKET_LIMITS['room:join'];
 const MISS = 'Zzyzx Qwertyuiop';
 const OK = { success: true, data: null };
 
@@ -70,6 +71,17 @@ describe('Socket rate limiting (e2e)', () => {
     await new Promise((resolve) => setTimeout(resolve, GUESSES.ttl));
     expect(await guess(again, names[0])).toEqual(OK);
     await vi.waitFor(async () => expect(await guess(a, MISS)).toEqual(OK));
+  });
+
+  it('refuses room:join over the limit, so codes cannot be tried', async () => {
+    const p = await player();
+    for (let i = 0; i < JOINS.limit; i += 1) {
+      expect(await ack(p, 'room:join', { code: 'ZZZZZZ' })).toMatchObject({
+        success: false,
+        error: { code: 'not_found' },
+      });
+    }
+    expectLockout(await ack(p, 'room:join', { code: 'ZZZZZZ' }), JOINS.ttl);
   });
 
   it('refuses the queue entry over the limit, refused ones counted', async () => {

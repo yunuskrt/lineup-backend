@@ -273,6 +273,7 @@ describe('Duel start (e2e)', () => {
       expect(await flipped).toEqual({
         winner: 'you',
         filters: NO_PREFERENCE,
+        source: 'coin',
       });
       await ready;
       expect(names(b)).toEqual([

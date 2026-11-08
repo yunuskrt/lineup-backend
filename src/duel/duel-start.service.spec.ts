@@ -243,10 +243,12 @@ describe('DuelStartService', () => {
       expect(ctx.last('a', 'coinFlip')).toEqual({
         winner: 'you',
         filters: A_FILTERS,
+        source: 'coin',
       });
       expect(ctx.last('b', 'coinFlip')).toEqual({
         winner: 'opponent',
         filters: A_FILTERS,
+        source: 'coin',
       });
     });
 
@@ -280,6 +282,7 @@ describe('DuelStartService', () => {
       expect(ctx.last('b', 'coinFlip')).toEqual({
         winner: 'you',
         filters: NO_PREFERENCE,
+        source: 'coin',
       });
     });
 
@@ -289,6 +292,7 @@ describe('DuelStartService', () => {
       expect(ctx.last('a', 'coinFlip')).toEqual({
         winner: 'you',
         filters: NO_PREFERENCE,
+        source: 'coin',
       });
     });
 
@@ -361,6 +365,69 @@ describe('DuelStartService', () => {
       await vi.advanceTimersByTimeAsync(REVEAL_MS);
       const json = JSON.stringify(ctx.sent);
       for (const name of NAMES) expect(json).not.toContain(name);
+    });
+  });
+
+  describe('a private room start', () => {
+    // c created the room; d joined it
+    function roomStart(prepare?: (ctx: ReturnType<typeof setup>) => void) {
+      const ctx = setup();
+      prepare?.(ctx);
+      const room = ctx.rooms.openRoom(
+        duelPlayer('c'),
+        duelPlayer('d'),
+        A_FILTERS,
+        T0,
+      );
+      ctx.service.openFlipped(room);
+      return { ...ctx, roomId: room.id };
+    }
+
+    it("reveals the creator's set at once, with no window", () => {
+      const ctx = roomStart();
+      expect(ctx.eventsOf('c')).toEqual(['coinFlip']);
+      expect(ctx.eventsOf('d')).toEqual(['coinFlip']);
+      expect(ctx.last('c', 'coinFlip')).toEqual({
+        winner: 'you',
+        filters: A_FILTERS,
+        source: 'room',
+      });
+      expect(ctx.last('d', 'coinFlip')).toEqual({
+        winner: 'opponent',
+        filters: A_FILTERS,
+        source: 'room',
+      });
+      expect(ctx.selector.check).not.toHaveBeenCalled();
+    });
+
+    it('starts after the reveal, the joiner on turn', async () => {
+      const ctx = roomStart();
+      await settle();
+      expect(ctx.selector.select).toHaveBeenCalledWith(A_FILTERS, ctx.random);
+      expect(ctx.eventsOf('d')).not.toContain('matchReady');
+
+      await vi.advanceTimersByTimeAsync(REVEAL_MS);
+      expect(ctx.eventsOf('c')).toEqual(['coinFlip', 'matchReady']);
+      expect(ctx.eventsOf('d')).toEqual(['coinFlip', 'matchReady']);
+      expect(ctx.last('d', 'matchReady')).toMatchObject({ turn: 'you' });
+      expect(ctx.last('c', 'matchReady')).toMatchObject({ turn: 'opponent' });
+      expect(ctx.rooms.get(ctx.roomId)).toMatchObject({
+        phase: 'playing',
+        origin: 'room',
+      });
+    });
+
+    it('tells both and closes when the pool emptied since', async () => {
+      const ctx = roomStart((c) =>
+        c.selector.select.mockResolvedValueOnce({ emptyBecause: 'club' }),
+      );
+      await settle();
+      expect(ctx.last('c', 'error')).toMatchObject({
+        code: 'empty_pool',
+        message: DUEL_START_MESSAGES.emptiedSinceFlip,
+      });
+      expect(ctx.last('d', 'error')).toMatchObject({ code: 'empty_pool' });
+      expect(ctx.rooms.get(ctx.roomId)).toBeNull();
     });
   });
 

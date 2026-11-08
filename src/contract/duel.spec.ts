@@ -79,6 +79,8 @@ describe('event and command maps', () => {
         'opponentConnection',
         'finished',
         'disconnected',
+        'roomCreated',
+        'roomExpired',
         'error',
       ].sort(),
     );

@@ -124,6 +124,11 @@ describe('SOCKET_LIMITS', () => {
     expect(SOCKET_LIMITS['duel:guess']).toEqual({ limit: 12, ttl: 3_000 });
   });
 
+  it('limits room joins and creates to 10 a minute', () => {
+    expect(SOCKET_LIMITS['room:join']).toEqual({ limit: 10, ttl: 60_000 });
+    expect(SOCKET_LIMITS['room:create']).toEqual({ limit: 10, ttl: 60_000 });
+  });
+
   it('names only duel commands, beside the default', () => {
     const commands = Object.keys(duelCommandSchemas);
     for (const name of Object.keys(SOCKET_LIMITS)) {
@@ -136,6 +141,8 @@ describe('SOCKET_LIMITS', () => {
     ['filters:submit', SOCKET_LIMITS['filters:submit']],
     ['queue:leave', SOCKET_LIMITS.default],
     ['duel:forfeit', SOCKET_LIMITS.default],
+    ['room:join', SOCKET_LIMITS['room:join']],
+    ['room:leave', SOCKET_LIMITS.default],
   ])('gives %s its limit', (command, expected) => {
     expect(socketLimitOf(command)).toEqual(expected);
   });

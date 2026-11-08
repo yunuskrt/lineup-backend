@@ -1,3 +1,4 @@
+import { NO_PREFERENCE } from '@/game/coin-flip.js';
 import { duelPlayer } from '@/contract/contract.fixtures.js';
 import { DuelRooms } from '@/duel/duel-rooms.js';
 
@@ -14,8 +15,24 @@ describe('DuelRooms', () => {
       id: expect.any(String),
       players: [duelPlayer('a'), duelPlayer('b')],
       pairedAt: 5,
+      origin: 'queue',
       phase: 'filters',
       submissions: [null, null],
+    });
+    expect(rooms.roomOf('a')).toBe(room);
+    expect(rooms.roomOf('b')).toBe(room);
+  });
+
+  it("opens a private room on the creator's fixed set", () => {
+    const filters = { ...NO_PREFERENCE, clubIds: ['liv'] };
+    const room = rooms.openRoom(duelPlayer('a'), duelPlayer('b'), filters, 7);
+    expect(room).toEqual({
+      id: expect.any(String),
+      players: [duelPlayer('a'), duelPlayer('b')],
+      pairedAt: 7,
+      origin: 'room',
+      phase: 'flipping',
+      flip: { winner: 0, filters },
     });
     expect(rooms.roomOf('a')).toBe(room);
     expect(rooms.roomOf('b')).toBe(room);

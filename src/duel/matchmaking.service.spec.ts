@@ -4,9 +4,11 @@ import type { User } from '@/contract/auth.js';
 import type { DuelEventMap } from '@/contract/duel.js';
 import type { DuelNotifier } from '@/duel/duel-notifier.js';
 import { DuelRooms } from '@/duel/duel-rooms.js';
-import { MATCHMAKING_MESSAGES } from '@/duel/duel-messages.js';
+import { MATCHMAKING_MESSAGES, ROOM_MESSAGES } from '@/duel/duel-messages.js';
 import type { DuelStartService } from '@/duel/duel-start.service.js';
 import { MatchmakingService } from '@/duel/matchmaking.service.js';
+import { MatchmakingQueue } from '@/duel/matchmaking-queue.js';
+import type { PrivateRoomsService } from '@/duel/private-rooms.service.js';
 
 const T0 = 1_000_000;
 const TIMEOUT_MS = 60_000;
@@ -33,7 +35,13 @@ function setup() {
   } as unknown as DuelNotifier;
   const rooms = new DuelRooms();
   const start = { open: vi.fn(), drop: vi.fn() };
+  const privateRooms = {
+    isHosting: vi.fn().mockReturnValue(false),
+    drop: vi.fn().mockReturnValue(false),
+  };
   const service = new MatchmakingService(
+    new MatchmakingQueue(),
+    privateRooms as unknown as PrivateRoomsService,
     rooms,
     notifier,
     start as unknown as DuelStartService,
@@ -42,7 +50,7 @@ function setup() {
   );
   const eventsOf = (to: string) =>
     sent.filter((s) => s.to === to).map((s) => s.event);
-  return { clock, sent, rooms, start, service, eventsOf };
+  return { clock, sent, rooms, start, privateRooms, service, eventsOf };
 }
 
 function refusal(action: () => void): ApiException['error'] | null {
@@ -141,6 +149,16 @@ describe('MatchmakingService', () => {
         message: MATCHMAKING_MESSAGES.inDuel,
       });
     });
+
+    it('refuses a player hosting a private room', () => {
+      const { service, sent, privateRooms } = setup();
+      privateRooms.isHosting.mockReturnValue(true);
+      expect(refusal(() => service.enter(user('a')))).toMatchObject({
+        code: 'forbidden',
+        message: ROOM_MESSAGES.hosting,
+      });
+      expect(sent).toEqual([]);
+    });
   });
 
   describe('leave', () => {
@@ -238,6 +256,14 @@ describe('MatchmakingService', () => {
       const { service, sent } = setup();
       service.drop('a');
       expect(sent).toEqual([]);
+    });
+
+    it("closes a creator's waiting room first, and stops there", () => {
+      const { service, start, privateRooms } = setup();
+      privateRooms.drop.mockReturnValue(true);
+      service.drop('a');
+      expect(privateRooms.drop).toHaveBeenCalledExactlyOnceWith('a');
+      expect(start.drop).not.toHaveBeenCalled();
     });
   });
 });

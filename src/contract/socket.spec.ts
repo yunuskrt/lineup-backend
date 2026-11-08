@@ -17,7 +17,7 @@ describe('socketCatalog', () => {
 
   it('lists every event and nothing else', () => {
     expect(Object.keys(catalog.events)).toEqual(Object.keys(duelEventSchemas));
-    expect(Object.keys(catalog.events)).toHaveLength(15);
+    expect(Object.keys(catalog.events)).toHaveLength(17);
   });
 
   it('names each payload, null when a command takes none', () => {

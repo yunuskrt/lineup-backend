@@ -17,6 +17,7 @@ export function playingRoom(firstSeat: Seat = 0): PlayingRoom {
     id: 'room-1',
     players: [duelPlayer('a'), duelPlayer('b')],
     pairedAt: T0,
+    origin: 'queue',
     phase: 'playing',
     flip: { winner: firstSeat === 0 ? 1 : 0, filters: NO_PREFERENCE },
     match: IDENTITY,

@@ -4,21 +4,23 @@ import { CLOCK, type Clock } from '@/common/clock.js';
 import type { User } from '@/contract/auth.js';
 import { MAX_LIVES } from '@/contract/constants.js';
 import type { DuelPlayer } from '@/contract/duel.js';
-import { MATCHMAKING_MESSAGES } from '@/duel/duel-messages.js';
+import { MATCHMAKING_MESSAGES, ROOM_MESSAGES } from '@/duel/duel-messages.js';
 import { DuelNotifier } from '@/duel/duel-notifier.js';
 import { DuelRooms } from '@/duel/duel-rooms.js';
 import { DuelStartService } from '@/duel/duel-start.service.js';
 import { MatchmakingQueue } from '@/duel/matchmaking-queue.js';
+import { PrivateRoomsService } from '@/duel/private-rooms.service.js';
 
 export const QUEUE_TIMEOUT_MS = Symbol('QUEUE_TIMEOUT_MS');
 export const DEFAULT_QUEUE_TIMEOUT_MS = 60_000;
 
 @Injectable()
 export class MatchmakingService implements OnModuleDestroy {
-  private readonly queue = new MatchmakingQueue();
   private readonly timers = new Map<string, NodeJS.Timeout>();
 
   constructor(
+    private readonly queue: MatchmakingQueue,
+    private readonly privateRooms: PrivateRoomsService,
     private readonly rooms: DuelRooms,
     private readonly notifier: DuelNotifier,
     private readonly start: DuelStartService,
@@ -32,6 +34,10 @@ export class MatchmakingService implements OnModuleDestroy {
     }
     if (this.rooms.roomOf(user.id)) {
       throw new ApiException('forbidden', MATCHMAKING_MESSAGES.inDuel);
+    }
+    // Queue and rooms exclude each other (R6)
+    if (this.privateRooms.isHosting(user.id)) {
+      throw new ApiException('forbidden', ROOM_MESSAGES.hosting);
     }
 
     const since = this.clock.now();
@@ -57,6 +63,7 @@ export class MatchmakingService implements OnModuleDestroy {
 
   // A connection that closed or was replaced
   drop(userId: string): void {
+    if (this.privateRooms.drop(userId)) return;
     if (this.queue.leave(userId)) {
       this.stopTimer(userId);
       return;

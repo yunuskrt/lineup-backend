@@ -152,12 +152,18 @@ export class DuelStartService implements OnModuleDestroy {
       id: room.id,
       players: room.players,
       pairedAt: room.pairedAt,
+      origin: room.origin,
       phase: 'flipping',
       flip: flipFilters(sets, this.random),
     };
     this.rooms.save(flipping);
-    this.sendEach(flipping, 'coinFlip', (seat) => toCoinFlip(flipping, seat));
-    void this.resolve(flipping, this.clock.now());
+    this.openFlipped(flipping);
+  }
+
+  // A room arrives here with its flip fixed (R6)
+  openFlipped(room: FlippingRoom): void {
+    this.sendEach(room, 'coinFlip', (seat) => toCoinFlip(room, seat));
+    void this.resolve(room, this.clock.now());
   }
 
   private async resolve(room: FlippingRoom, flippedAt: number): Promise<void> {

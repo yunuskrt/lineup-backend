@@ -67,7 +67,7 @@ The single biggest quality lever in the product. A random Premier League fixture
 - Filters: competition (league / UCL / UEL / World Cup / Euro), club, era range.
 - **No player-facing difficulty selector.** `memorability_score` is an internal quality gate — it decides what enters the pool, never what the player chooses. Exposing it would turn a curation signal into a promise the data can't keep.
 - **Solo:** filters are the player's own.
-- **Duel:** both players submit preferences after matching; the server picks **one of the two filter sets at random** and applies it whole, then tells both players whose was used. Chosen over an intersection because it can never collapse to an empty pool, needs no fallback threshold to tune, and is fair by construction — across a session each player gets their own filters half the time.
+- **Duel:** both players submit preferences after matching; the server picks **one of the two filter sets at random** and applies it whole, then tells both players whose was used. Chosen over an intersection because it can never collapse to an empty pool, needs no fallback threshold to tune, and is fair by construction — across a session each player gets their own filters half the time. In a private room, the creator's filters are used instead.
 - Team selection (home or away) is server-side and weighted by guessability and star power, not a coin flip — the goal is a squad that is _hard but fair_.
 - **Solo lets the player pick the side; duel does not** — in a duel the same squad must be shared, so the server decides.
 
@@ -85,6 +85,7 @@ Underestimating this will sink the game. "Ibrahimovic", "Zlatan", "İbrahimović
 
 - Two users match from a lobby. 3 lives each.
 - **Matchmaking is FIFO.** The first two waiting clients are paired — no skill rating, no ELO, no bracketing at MVP. A pairing algorithm needs a player base before it's worth building.
+- **Private rooms.** A player can create a room and share its 6-character code (or a link); a friend joins with it. A room holds two players and waits 10 minutes. The creator's filters are applied whole, with no coin flip. Everything after the pairing is the duel above.
 - Alternating rounds, **15 seconds** per round, timer reset on each turn handover.
 - **Shared found-pool.** Both players guess from the same XI and see the same list of already-revealed players.
 - Round resolution:
@@ -214,7 +215,7 @@ The naive approach — ingest 26 seasons × 24 clubs × ~50 matches — is rough
 /sign-in              Sign in, sign up, continue as guest
 /play                 Mode select + filter preferences
 /play/solo            Filters → match → guessing loop → summary
-/play/duel            Lobby → matchmaking → live duel → result
+/play/duel            Lobby → matchmaking or a private room → live duel → result
 /profile              History, stats, guest → account upgrade
 /leaderboard          Post-MVP
 ```
@@ -228,10 +229,10 @@ Expo Router mirrors these paths on mobile so deep links and analytics events are
 ## 🎯 MVP Scope
 
 - **Data:** metadata for the full 2000–2026 range across target clubs and tournaments; memorability scores; full lineups + alias sets for the shortlisted pool
-- **Game:** guest + account auth, filters, solo mode, live 1v1 duel with FIFO matchmaking, 3 lives, 15s server-authoritative rounds, starting XI only, shared found-pool, fuzzy answer matching, win / loss / draw results, end-of-game summary
+- **Game:** guest + account auth, filters, solo mode, live 1v1 duel with FIFO matchmaking, private rooms (create, join by code), 3 lives, 15s server-authoritative rounds, starting XI only, shared found-pool, fuzzy answer matching, win / loss / draw results, end-of-game summary
 - **Platforms:** **web first**, fully playable and deployed. Mobile follows on the same backend and the same protocol
 - **UI:** Home, Mode/Filters, Solo game, Duel lobby, Duel game, Result, Profile
-- **Postponed:** leaderboards, friend invites / private lobbies, ranked ELO, daily challenge, tournaments-within-the-app, achievements, social sharing, push notifications, spectating
+- **Postponed:** leaderboards, friend invites, rematch, ranked ELO, daily challenge, tournaments-within-the-app, achievements, social sharing, push notifications, spectating
 
 ---
 
@@ -255,7 +256,7 @@ Expo Router mirrors these paths on mobile so deep links and analytics events are
 16. **Pro status is resolved server-side and is platform-agnostic** — bought on any platform, honoured on all of them. The client never asserts its own tier.
 17. **The answerable squad is the starting XI — exactly 11 players.** Substitutes are never answers, never revealed, never scored.
 18. **A duel in which all 11 starters are named ends in a draw.** No sudden death, no replacement match, no tiebreak on lives.
-19. **Duel filter conflicts are settled by a coin flip** — one player's set is applied whole, and both players are told whose. Never merged, never intersected.
+19. **Duel filter conflicts are settled by a coin flip** — one player's set is applied whole, and both players are told whose. Never merged, never intersected. **In a private room the creator's set is applied, and both are told.**
 20. **`memorability_score` is never exposed to players.** No difficulty selector, no score display, no sorting by it.
 
 ---
@@ -305,6 +306,8 @@ Pro sells **depth and convenience in solo play**. It never sells advantage in du
 | New league / season packs                            | On release         | Early access                                        |
 | Cosmetics (badges, club flair, frames)               | Defaults           | Full set                                            |
 | Ads                                                  | Yes                | None                                                |
+
+Private rooms are open to everyone at launch; hosting as a Pro feature is a later decision.
 
 **Free duels are never capped.** Free users are the matchmaking pool — throttling them starves paying players of opponents. Cap solo instead.
 

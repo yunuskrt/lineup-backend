@@ -378,6 +378,9 @@ Every command is acked with the §2 envelope, `data` empty. **Outcomes arrive as
 | `submitFilters(filters)` | `filters:submit` | `Filters` | `forbidden` (filters not open), `invalid_input`, `empty_pool` + `emptyBecause` (refused before the coin flip) |
 | `guess(request)` | `duel:guess` | `{ sessionId, guess }` (guess trimmed, 1–64) | `invalid_input`, `session_over`, `forbidden` (not your turn), `rate_limited` + `retryAfterMs` |
 | `forfeit()` | `duel:forfeit` | — | `forbidden` (no duel running) |
+| `createRoom(filters)` | `room:create` | `Filters` | `forbidden` (queued, already hosting a room, or in a duel), `invalid_input`, `empty_pool` + `emptyBecause` (checked now; nothing is stored) |
+| `joinRoom(code)` | `room:join` | `RoomJoinRequest` | `not_found` (no open room has that code: wrong, expired, left or already joined), `forbidden` (your own room, or you're queued, hosting or in a duel), `invalid_input` (not 6 characters of the code alphabet) |
+| `leaveRoom()` | `room:leave` | — | `forbidden` (not hosting an open room) |
 | `disconnect()` | socket close | — | — |
 
 ### Server → client events (`DuelEventMap`)
@@ -400,6 +403,8 @@ Every command is acked with the §2 envelope, `data` empty. **Outcomes arrive as
 | `opponentConnection` | `ConnectionState` | The opponent drops, comes back, or the window closes |
 | `finished` | `DuelResult` | Win, loss, draw (all 11 named) or forfeit |
 | `disconnected` | `ConnectionState` | **Your own** connection state (reconnecting, then back, or forfeited) |
+| `roomCreated` | `RoomState` | To the creator, after an accepted `room:create` (R6) |
+| `roomExpired` | `RoomExpiry` | To the creator, 10 minutes after `roomCreated` if no one joined. The room is gone and its code is free |
 | `error` | `ApiError` | Errors outside a command ack, e.g. `empty_pool` after the flip, or `rate_limited` |
 
 ### Duel payload types
@@ -410,7 +415,10 @@ Every command is acked with the §2 envelope, `data` empty. **Outcomes arrive as
 | `QueueTimeout` | `phase: 'queued'`, `waitedMs: integer ≥ 0` |
 | `PairedState` | `phase: 'paired'`, `opponent: DuelPlayer` |
 | `FilterSubmission` | `yours: FilterSubmissionStatus`, `theirs: FilterSubmissionStatus` |
-| `CoinFlipResult` | `winner: DuelActor`, `filters: Filters` (the set applied) |
+| `CoinFlipResult` | `winner: DuelActor`, `filters: Filters` (the set applied), `source: 'coin' \| 'room'` (R6). `coin` for a queue pairing; `room` for a private room, where `winner` is the creator |
+| `RoomState` | `code` (6 characters, uppercase), `filters: Filters` (as applied), `expiresAt: epoch ms` |
+| `RoomExpiry` | `code` |
+| `RoomJoinRequest` | `code`: 6 characters of `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, any case (uppercased before the check) |
 | `DuelPlayer` | `id`, `handle` (non-empty), `lives` (0–3) |
 | `DuelLifeLost` | `who: DuelActor`, `lives: 0–3` (after the loss) |
 | `ConnectionState` | `status: ConnectionStatus`, `reconnectDeadline: epoch ms or null` |
@@ -447,6 +455,17 @@ Every command is acked with the §2 envelope, `data` empty. **Outcomes arrive as
 - **Expiry:** `lifeLost`, `turnChanged`, then `roundStarted`. If the player who lost the life is at 0, `finished` replaces the last two.
 - **Draw:** all 11 named ends in an instant `finished` with `outcome: draw`.
 - **Reconnect window:** 20 s. The dropped player's clock **keeps running**. `opponentConnection` and `disconnected` carry `reconnectDeadline` while it's open.
+
+### Private rooms (R6)
+
+- **A second way to pair.** The creator sends `room:create` with their filters and gets `roomCreated` with a code. The friend sends `room:join` with it. Anyone may create or join, guests included.
+- **On join:** `paired` to both at once, then `coinFlip` with `source: 'room'` (`winner` is the creator, `filters` are the room's), then `matchReady` 2 s later. There is no filter window and no `filtersUpdated`. Everything from `matchReady` on is the duel above.
+- **The joiner names first:** the flip's loser always starts, and in a room the creator is the winner.
+- **The code:** 6 characters, no `0 O 1 I L`, unique among open rooms. A room is open until someone joins, the creator leaves, the creator's socket closes or is taken over (at once, with no reconnect window), or 10 minutes pass (`roomExpired`). `expiresAt` is for showing the time left; the server decides the expiry.
+- **One room at a time:** a creator can't create again, join another room or enter the queue until the room closes. A queued player can't create or join.
+- **After a join** the code is gone: a second `room:join` with it is `not_found`, the same as a wrong code.
+- **Empty pool after the join** (an ingest run in between): the `error` event with `empty_pool` to both, and the room closes.
+- **Rate limits:** `room:join` and `room:create`, 10 a minute per user each; `room:leave` shares the default.
 
 ---
 

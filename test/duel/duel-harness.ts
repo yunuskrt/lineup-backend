@@ -9,8 +9,12 @@ import { RANDOM } from '@/common/random.js';
 import { ENV } from '@/config/config.module.js';
 import type { Env } from '@/config/env.schema.js';
 import { loadEnv } from '@/config/load-env.js';
-import { duelEventSchemas, type DuelSession } from '@/contract/duel.js';
-import type { MatchInPlay } from '@/contract/match.js';
+import {
+  duelEventSchemas,
+  type DuelSession,
+  type RoomState,
+} from '@/contract/duel.js';
+import type { Filters, MatchInPlay } from '@/contract/match.js';
 import { PROTOCOL_VERSION } from '@/contract/protocol.js';
 import { socketAckSchema } from '@/contract/socket.js';
 import { NO_PREFERENCE } from '@/game/coin-flip.js';
@@ -176,6 +180,27 @@ export class DuelHarness {
     await this.ack(b, 'filters:submit', NO_PREFERENCE);
     const [{ sessionId, match }] = await Promise.all([aReady, bReady]);
     return { a, b, sessionId, match };
+  }
+
+  // Resolves with the new room's code
+  async createRoom(
+    client: Client,
+    filters: Filters = NO_PREFERENCE,
+  ): Promise<string> {
+    const created = nextEvent<RoomState>(client.socket, 'roomCreated');
+    await this.ack(client, 'room:create', filters);
+    return (await created).code;
+  }
+
+  // a creates, b joins in lowercase: a holds seat 0
+  async pairByRoom(): Promise<PairedDuel & { code: string }> {
+    const [a, b] = await Promise.all([this.client(), this.client()]);
+    const code = await this.createRoom(a);
+    const aReady = nextEvent<DuelSession>(a.socket, 'matchReady');
+    const bReady = nextEvent(b.socket, 'matchReady');
+    await this.ack(b, 'room:join', { code: code.toLowerCase() });
+    const [{ sessionId, match }] = await Promise.all([aReady, bReady]);
+    return { a, b, sessionId, match, code };
   }
 
   async squadOf(match: MatchInPlay): Promise<Squad> {

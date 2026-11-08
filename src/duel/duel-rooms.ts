@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { DuelPlayer } from '@/contract/duel.js';
-import type { DuelRoom, FiltersRoom } from '@/duel/duel-room.js';
+import type { Filters } from '@/contract/match.js';
+import type { DuelRoom, FiltersRoom, FlippingRoom } from '@/duel/duel-room.js';
 
 @Injectable()
 export class DuelRooms {
@@ -10,18 +11,31 @@ export class DuelRooms {
 
   // A new pair starts on filters
   open(first: DuelPlayer, second: DuelPlayer, pairedAt: number): FiltersRoom {
-    const room: FiltersRoom = {
+    return this.register({
       id: randomUUID(),
       players: [first, second],
       pairedAt,
+      origin: 'queue',
       phase: 'filters',
       submissions: [null, null],
-    };
-    this.rooms.set(room.id, room);
-    for (const player of room.players) {
-      this.roomIdByUser.set(player.id, room.id);
-    }
-    return room;
+    });
+  }
+
+  // The creator's set, fixed: no window, no toss
+  openRoom(
+    creator: DuelPlayer,
+    joiner: DuelPlayer,
+    filters: Filters,
+    pairedAt: number,
+  ): FlippingRoom {
+    return this.register({
+      id: randomUUID(),
+      players: [creator, joiner],
+      pairedAt,
+      origin: 'room',
+      phase: 'flipping',
+      flip: { winner: 0, filters },
+    });
   }
 
   // False once the room has closed
@@ -38,6 +52,14 @@ export class DuelRooms {
   roomOf(userId: string): DuelRoom | null {
     const roomId = this.roomIdByUser.get(userId);
     return roomId === undefined ? null : this.get(roomId);
+  }
+
+  private register<R extends DuelRoom>(room: R): R {
+    this.rooms.set(room.id, room);
+    for (const player of room.players) {
+      this.roomIdByUser.set(player.id, room.id);
+    }
+    return room;
   }
 
   close(roomId: string): void {

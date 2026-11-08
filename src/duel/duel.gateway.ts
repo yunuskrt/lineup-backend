@@ -22,6 +22,8 @@ import {
   duelCommandSchemas,
   type DuelGuessRequest,
   duelGuessRequestSchema,
+  type RoomJoinRequest,
+  roomJoinRequestSchema,
 } from '@/contract/duel.js';
 import { type Filters, filtersSchema } from '@/contract/match.js';
 import type {
@@ -34,6 +36,7 @@ import { DuelNotifier, roomOf } from '@/duel/duel-notifier.js';
 import { DuelPlayService } from '@/duel/duel-play.service.js';
 import { DuelStartService } from '@/duel/duel-start.service.js';
 import { MatchmakingService } from '@/duel/matchmaking.service.js';
+import { PrivateRoomsService } from '@/duel/private-rooms.service.js';
 import { SocketAuthService } from '@/duel/socket-auth.service.js';
 import { SocketRateLimitGuard } from '@/duel/socket-rate-limit.guard.js';
 import {
@@ -76,6 +79,7 @@ export class DuelGateway
     private readonly connections: ConnectionRegistry<DuelSocket>,
     private readonly notifier: DuelNotifier,
     private readonly matchmaking: MatchmakingService,
+    private readonly privateRooms: PrivateRoomsService,
     private readonly start: DuelStartService,
     private readonly play: DuelPlayService,
   ) {}
@@ -130,6 +134,35 @@ export class DuelGateway
   ): SocketAck {
     parseCommand('queue:leave', payload);
     this.matchmaking.leave(socket.data.user.id);
+    return SUCCESS_ACK;
+  }
+
+  @SubscribeMessage('room:create')
+  async createRoom(
+    @ConnectedSocket() socket: DuelSocket,
+    @MessageBody(new ZodValidationPipe(filtersSchema)) filters: Filters,
+  ): Promise<SocketAck> {
+    await this.privateRooms.create(socket.data.user, filters, socket.id);
+    return SUCCESS_ACK;
+  }
+
+  @SubscribeMessage('room:join')
+  joinRoom(
+    @ConnectedSocket() socket: DuelSocket,
+    @MessageBody(new ZodValidationPipe(roomJoinRequestSchema))
+    request: RoomJoinRequest,
+  ): SocketAck {
+    this.privateRooms.join(socket.data.user, request.code);
+    return SUCCESS_ACK;
+  }
+
+  @SubscribeMessage('room:leave')
+  leaveRoom(
+    @ConnectedSocket() socket: DuelSocket,
+    @MessageBody() payload: unknown,
+  ): SocketAck {
+    parseCommand('room:leave', payload);
+    this.privateRooms.leave(socket.data.user.id);
     return SUCCESS_ACK;
   }
 

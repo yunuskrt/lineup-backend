@@ -60,3 +60,4 @@ Not Started
 - R4a Solo Offer Match: SoloMatchOffer.match, home/away kept, deprecated
 - R4b Named Order: order + elapsedMs on summary/result, duel events guard
 - R5 Player Directory: GET /catalog/players, opaque keys, ETag 304, br/gzip
+- R6a Private Rooms: room:create/join/leave, 6-char code, 10 min, source room

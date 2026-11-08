@@ -1,8 +1,10 @@
+import { Injectable } from '@nestjs/common';
 import type { DuelPlayer } from '@/contract/duel.js';
 
 export type Waiting = { player: DuelPlayer; since: number };
 
-// Insertion order is queue order
+// Insertion order is queue order; rooms read it
+@Injectable()
 export class MatchmakingQueue {
   private readonly waiting = new Map<string, Waiting>();
 

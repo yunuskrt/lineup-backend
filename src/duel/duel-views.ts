@@ -56,6 +56,7 @@ export function toCoinFlip(
   return {
     winner: actorOf(room.flip.winner, receiver),
     filters: room.flip.filters,
+    source: room.origin === 'room' ? 'room' : 'coin',
   };
 }
 

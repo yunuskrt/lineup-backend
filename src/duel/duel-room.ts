@@ -7,11 +7,15 @@ import type { Seat } from '@/game/engine.js';
 import type { TimedEffect, TimedGame } from '@/game/timed-game.js';
 import type { LoadedSquad } from '@/matches/squad-loader.service.js';
 
-// Seat 0 queued first; the id is the sessionId
+// How the pair met: the queue or a code (R6)
+export type DuelOrigin = 'queue' | 'room';
+
+// Seat 0 queued first or created the room
 type RoomBase = {
   readonly id: string;
   readonly players: readonly [DuelPlayer, DuelPlayer];
   readonly pairedAt: number;
+  readonly origin: DuelOrigin;
 };
 
 export type FiltersRoom = RoomBase & {

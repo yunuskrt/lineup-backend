@@ -3,6 +3,7 @@ import type { Env } from '@/config/env.schema.js';
 import type { Filters } from '@/contract/match.js';
 import type { CompetitionKind } from '@/generated/prisma/client.js';
 import { MatchSelectorService } from '@/matches/match-selector.service.js';
+import { LANDING_SHOWCASE } from '@/matches/showcase.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
 import { type Tx, useRolledBackDb } from '@test/schema/schema-test-utils.js';
 
@@ -164,6 +165,7 @@ const selector = (tx: Tx, includeUnscored: boolean) =>
     {
       MATCH_POOL_INCLUDE_UNSCORED: includeUnscored,
     } as Env,
+    LANDING_SHOWCASE,
   );
 
 const ALL_ERAS = { from: 2000, to: 2025 };

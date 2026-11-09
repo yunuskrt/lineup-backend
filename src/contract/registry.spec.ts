@@ -37,6 +37,10 @@ describe('contractRegistry', () => {
         'DuelNamedPlayer',
         'DirectoryPlayer',
         'PlayerDirectory',
+        'CatalogOverview',
+        'Showcase',
+        'ShowcaseDemo',
+        'ShowcasePlayer',
       ]),
     );
   });

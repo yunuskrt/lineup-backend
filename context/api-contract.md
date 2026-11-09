@@ -209,6 +209,7 @@ Paths are suggestions. Every response body is the envelope from §2, wrapping th
 | 14 | `profile.getProfile` | `GET /profile` | — | `Profile` |
 | 15 | `profile.getHistory` | `GET /profile/history?cursor=&limit=` | `HistoryQuery` | `HistoryPage` |
 | 16 | `catalog.getPlayerDirectory` | `GET /catalog/players` | — | `PlayerDirectory` (R5), or `304` with no body |
+| 17 | `catalog.getOverview` | `GET /catalog/overview` | — | `CatalogOverview` (R7). Public: no session needed |
 
 Better Auth (B10) mounts its own routes. Calls 1–6 may map onto them rather than onto these paths; the web only needs the shapes.
 
@@ -265,6 +266,43 @@ The `Filters` request is unchanged: `competitionIds` is still an array, and any 
 | `Content-Encoding` | `br` when accepted, else `gzip`, else none. `Vary: Accept-Encoding` |
 
 CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate through the browser cache or by hand.
+
+**`CatalogOverview`** (R7). What the playable pool holds, for a home or landing screen. **Public** (no session), rate-limited with the `catalog` limit (60 a minute). Every figure is over the matches the selector can serve, the same pool `FilterOptions` reads; the showcase match is never one of them. Dataset figures only: no community activity, no memorability score (HC 20). The server keeps the built overview for **5 minutes**, so new data shows within that.
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `counts.matches` | integer ≥ 0 | Pool matches |
+| `counts.players` | integer ≥ 0 | Distinct starters of those matches, both sides |
+| `counts.clubs` | integer ≥ 0 | Distinct sides that are clubs |
+| `counts.nationalTeams` | integer ≥ 0 | Distinct sides that are national teams |
+| `counts.seasons` | integer ≥ 0 | Distinct season start years |
+| `era` | `{ from, to }` | As `FilterOptions.era` |
+| `highlights.finals` | integer ≥ 0 | Matches with `stage` exactly `Final` |
+| `highlights.shootouts` | integer ≥ 0 | Matches decided on penalties |
+| `highlights.extraTime` | integer ≥ 0 | Matches that went to extra time |
+| `highlights.goals` | integer ≥ 0 | Both sides' goals, summed |
+| `competitions` | `CompetitionRef[]` | The pool's competitions, by name, as `FilterOptions.competitions` |
+| `topClubs` | `ClubRef[]`, at most 12 | Clubs only (no national teams), most pool matches first, then by name |
+| `showcase` | `Showcase` or `null` | `null` when its data doesn't check out; every other field still returns |
+
+**`Showcase`.** One real XI shown whole, for a scripted demo. It is a backend constant (a match slug, a side, the reveal order and a wrong guess, all by slug), checked against the data on every read. **Its match is never served as a game** (solo, duel or room), so sending this XI breaks nothing (HC 2).
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `match` | `MatchInPlay` | The match, with `side` the XI shown and its `formation` |
+| `players` | `RevealedPlayer[]`, exactly 11 | That side's XI, by slot, each slot once, with `directoryKey` |
+| `demo` | `ShowcaseDemo` | |
+
+**`ShowcaseDemo`**
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `reveals` | integer[] | 1–11 distinct slots, in the order the demo reveals them |
+| `miss` | `ShowcasePlayer` or `null` | The demo's wrong guess: a starter of the **other** side, so it really isn't in this XI |
+
+**`ShowcasePlayer`** = `{ name, imageUrl, directoryKey }`, as on `RevealedPlayer`.
+
+`showcase` is `null` if its match isn't loaded, the side has no formation or not 11 starters, a slot breaks the formation, a starter has no alias, a reveal isn't in that XI, or the miss isn't in the other one. The response is otherwise unchanged.
 
 **`SoloMatchOffer`.** The run is created and the player picks a side next.
 
@@ -345,6 +383,7 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | `getSummary` | `not_found`, `invalid_input`, `forbidden` (run still in progress) |
 | `getProfile`, `getHistory` | `unauthorized`; `getHistory` also `invalid_input` |
 | `getPlayerDirectory` | `unauthorized`, `rate_limited` + `retryAfterMs` |
+| `getOverview` | `rate_limited` + `retryAfterMs` |
 | Any | `server_error` |
 
 ### Solo behaviour the web relies on

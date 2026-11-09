@@ -14,6 +14,7 @@ import {
   selectFrom,
   TOURNAMENT_KINDS,
 } from '@/matches/pool-rules.js';
+import { SHOWCASE, type ShowcaseSpec } from '@/matches/showcase.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 
 // Lineups are counted, never selected (HC 2)
@@ -36,7 +37,10 @@ type CandidateRow = Prisma.MatchGetPayload<{
 }>;
 
 // The score is a where clause only (HC 20)
-export function poolWhere(includeUnscored: boolean): Prisma.MatchWhereInput {
+export function poolWhere(
+  includeUnscored: boolean,
+  excludedSlugs: readonly string[],
+): Prisma.MatchWhereInput {
   const kinds = [...TOURNAMENT_KINDS];
   const scored: Prisma.MatchWhereInput[] = [
     {
@@ -49,7 +53,12 @@ export function poolWhere(includeUnscored: boolean): Prisma.MatchWhereInput {
     },
   ];
   const unscored = includeUnscored ? [{ memorability: { is: null } }] : [];
-  return { OR: [...scored, ...unscored] };
+  return {
+    AND: [
+      { OR: [...scored, ...unscored] },
+      { slug: { notIn: [...excludedSlugs] } },
+    ],
+  };
 }
 
 // Stands in for B21's gate: both XIs whole
@@ -72,17 +81,21 @@ function toCandidate(row: CandidateRow): PoolCandidate | null {
 @Injectable()
 export class MatchSelectorService {
   private readonly includeUnscored: boolean;
+  // Its XI is public on the landing page
+  private readonly excludedSlugs: readonly string[];
 
   constructor(
     private readonly prisma: PrismaService,
     @Inject(ENV) env: Env,
+    @Inject(SHOWCASE) showcase: ShowcaseSpec,
   ) {
     this.includeUnscored = env.MATCH_POOL_INCLUDE_UNSCORED;
+    this.excludedSlugs = [showcase.matchSlug];
   }
 
   async candidates(): Promise<PoolCandidate[]> {
     const rows = await this.prisma.match.findMany({
-      where: poolWhere(this.includeUnscored),
+      where: poolWhere(this.includeUnscored, this.excludedSlugs),
       select: CANDIDATE_SELECT,
       orderBy: { id: 'asc' },
     });

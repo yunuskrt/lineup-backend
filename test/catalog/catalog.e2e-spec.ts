@@ -8,7 +8,9 @@ import { ENV } from '@/config/config.module.js';
 import type { Env } from '@/config/env.schema.js';
 import { filterOptionsSchema } from '@/contract/catalog.js';
 import { MatchSelectorService } from '@/matches/match-selector.service.js';
+import { PlayerKeysService } from '@/matches/player-keys.service.js';
 import { poolCoverage } from '@/matches/pool-rules.js';
+import { LANDING_SHOWCASE } from '@/matches/showcase.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 import { type Tx, useRolledBackDb } from '@test/schema/schema-test-utils.js';
 
@@ -195,8 +197,15 @@ describe('CatalogService over a rolled-back pool (e2e)', () => {
       const ids = await build(tx);
       const db = tx as unknown as PrismaService;
       const env = { MATCH_POOL_INCLUDE_UNSCORED: false } as Env;
-      const selector = new MatchSelectorService(db, env);
-      const catalog = new CatalogService(selector, db, env);
+      const selector = new MatchSelectorService(db, env, LANDING_SHOWCASE);
+      const catalog = new CatalogService(
+        selector,
+        db,
+        env,
+        new PlayerKeysService({ BETTER_AUTH_SECRET: 'catalog-e2e' } as Env),
+        LANDING_SHOWCASE,
+        { now: () => Date.now() },
+      );
       const options = await catalog.filterOptions();
       return { ids, listed: options.competitions.map((c) => c.id) };
     });

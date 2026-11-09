@@ -17,6 +17,8 @@ export const MAX_HISTORY_LIMIT = 50;
 export const FIRST_SEASON_START = 2000;
 export const LAST_SEASON_START = 2025;
 
+export const TOP_CLUBS_LIMIT = 12;
+
 // No 0 O 1 I L: nothing to misread
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const ROOM_CODE_LENGTH = 6;

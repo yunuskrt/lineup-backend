@@ -15,6 +15,8 @@ import {
 } from '@/common/contract-response.js';
 import { RateLimit } from '@/common/rate-limits.js';
 import {
+  type CatalogOverview,
+  catalogOverviewSchema,
   type FilterOptions,
   filterOptionsSchema,
   playerDirectorySchema,
@@ -35,6 +37,15 @@ export class CatalogController {
   @ContractResponse(filterOptionsSchema)
   filterOptions(): Promise<FilterOptions> {
     return this.catalog.filterOptions();
+  }
+
+  // Public: the landing page has no session yet
+  @Public()
+  @Get('overview')
+  @RateLimit('catalog')
+  @ContractResponse(catalogOverviewSchema)
+  overview(): Promise<CatalogOverview> {
+    return this.catalog.overview();
   }
 
   // Any session, guests too; never scoped (HC 2)

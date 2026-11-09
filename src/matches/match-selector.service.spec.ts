@@ -5,6 +5,7 @@ import {
   poolWhere,
 } from '@/matches/match-selector.service.js';
 import { POOL_THRESHOLD, TOURNAMENT_KINDS } from '@/matches/pool-rules.js';
+import { LANDING_SHOWCASE } from '@/matches/showcase.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
 
 const ALL: Filters = {
@@ -35,6 +36,7 @@ function serviceWith(includeUnscored: boolean) {
   const service = new MatchSelectorService(
     prisma as unknown as PrismaService,
     env,
+    LANDING_SHOWCASE,
   );
   return { prisma, service };
 }
@@ -52,15 +54,28 @@ describe('poolWhere', () => {
     },
   ];
 
+  const excluded = { slug: { notIn: ['shown'] } };
+
   it('applies the threshold by competition kind', () => {
-    expect(poolWhere(false)).toEqual({ OR: scored });
+    expect(poolWhere(false, ['shown'])).toEqual({
+      AND: [{ OR: scored }, excluded],
+    });
   });
 
   it('adds only the unscored branch with the flag on', () => {
-    expect(poolWhere(true)).toEqual({
-      OR: [...scored, { memorability: { is: null } }],
+    expect(poolWhere(true, ['shown'])).toEqual({
+      AND: [{ OR: [...scored, { memorability: { is: null } }] }, excluded],
     });
   });
+
+  it.each([false, true])(
+    'leaves out an excluded slug with the flag %s',
+    (includeUnscored) => {
+      expect(poolWhere(includeUnscored, ['a', 'b']).AND).toContainEqual({
+        slug: { notIn: ['a', 'b'] },
+      });
+    },
+  );
 
   it('gives tournaments the lower threshold', () => {
     expect(POOL_THRESHOLD.tournament).toBeLessThan(POOL_THRESHOLD.league);
@@ -69,12 +84,12 @@ describe('poolWhere', () => {
 });
 
 describe('MatchSelectorService', () => {
-  it('reads the pool with the flag from the env', async () => {
+  it('reads the pool with the flag, never the showcase', async () => {
     const { prisma, service } = serviceWith(true);
     await service.candidates();
     expect(prisma.match.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: poolWhere(true),
+        where: poolWhere(true, [LANDING_SHOWCASE.matchSlug]),
         orderBy: { id: 'asc' },
       }),
     );

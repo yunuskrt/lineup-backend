@@ -14,7 +14,7 @@ const reasonOf = (view: ShowcaseView) =>
   'reason' in view ? view.reason : null;
 
 describe('toShowcase', () => {
-  it('builds the real constant: 11 players, five reveals, the miss', () => {
+  it('builds the real constant: 11 players, eight reveals, the miss', () => {
     const view = toShowcase(LANDING_SHOWCASE, row(), undefined, keyOf);
     if (!('showcase' in view)) throw new Error(view.reason);
     const { match, players, demo } = view.showcase;
@@ -36,7 +36,7 @@ describe('toShowcase', () => {
       imageUrl: null,
       directoryKey: keyOf('home-8'),
     });
-    expect(demo.reveals).toEqual([8, 10, 9, 6, 5]);
+    expect(demo.reveals).toEqual([8, 10, 9, 7, 5, 2, 0, 4]);
     expect(demo.miss).toEqual({
       name: 'away starter 10',
       imageUrl: null,
@@ -130,6 +130,17 @@ describe('toShowcase', () => {
       keyOf,
     );
     expect(reasonOf(view)).toBe('home side has no formation or no opponent');
+  });
+
+  it('gives a reason when an R8 reveal leaves the XI', () => {
+    const home = team('home', { ...HOME_SLUGS, 4: 'someone-else' });
+    const view = toShowcase(
+      LANDING_SHOWCASE,
+      row([home, team('away', AWAY_SLUGS)]),
+      undefined,
+      keyOf,
+    );
+    expect(reasonOf(view)).toBe('reveal marcelo is not in the home XI');
   });
 
   it('gives a reason for a repeated reveal', () => {

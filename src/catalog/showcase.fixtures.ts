@@ -4,10 +4,13 @@ import { positionForSlot } from '@/game/formation.js';
 
 type Team = ShowcaseRow['teams'][number];
 
-// As the real 4-3-3: forwards 8–10, midfield 5–7
+// The real slots: Navas 0, Ramos 2, Marcelo 4…
 export const HOME_SLUGS: Record<number, string> = {
+  0: 'keylor-navas',
+  2: 'sergio-ramos',
+  4: 'marcelo',
   5: 'toni-kroos',
-  6: 'luka-modric',
+  7: 'luka-modric',
   8: 'gareth-bale',
   9: 'karim-benzema',
   10: 'cristiano-ronaldo',

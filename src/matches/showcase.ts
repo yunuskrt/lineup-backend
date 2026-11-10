@@ -22,6 +22,9 @@ export const LANDING_SHOWCASE: ShowcaseSpec = {
     'karim-benzema',
     'luka-modric',
     'toni-kroos',
+    'sergio-ramos',
+    'keylor-navas',
+    'marcelo',
   ],
   miss: 'lionel-messi',
 };

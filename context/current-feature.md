@@ -63,3 +63,4 @@ Not Started
 - R6a Private Rooms: room:create/join/leave, 6-char code, 10 min, source room
 - R6b Room History: is_private on game_sessions, HistoryEntry.isPrivate
 - R7 Catalog Overview: GET /catalog/overview, showcase off pool, 5m cache
+- R8 Showcase Reveals: +Ramos, Navas, Marcelo; reveals 8,10,9,7,5,2,0,4

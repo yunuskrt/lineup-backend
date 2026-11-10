@@ -292,20 +292,15 @@ Previously open; now settled, and the spec above reflects them.
 
 Pro sells **depth and convenience in solo play**. It never sells advantage in duels — see Hard Constraint 15.
 
-| Feature                                              | Free               | Pro                                                 |
-| ---------------------------------------------------- | ------------------ | --------------------------------------------------- |
-| 1v1 duels                                            | Unlimited          | Unlimited                                           |
-| Solo runs                                            | Daily cap          | Unlimited                                           |
-| **Exact match selection** (pick the precise fixture) | ✗                  | ✓                                                   |
-| Archive browse & search                              | ✗                  | ✓                                                   |
-| Saved filter presets                                 | ✗                  | ✓                                                   |
-| Practice mode (no lives, no timer)                   | ✗                  | ✓                                                   |
-| Post-game review                                     | Missed count only  | Full XI + every player missed                       |
-| Stats                                                | Win/loss, accuracy | Per-club and per-era breakdown, most-missed players |
-| Private lobbies                                      | Join only          | Host + join                                         |
-| New league / season packs                            | On release         | Early access                                        |
-| Cosmetics (badges, club flair, frames)               | Defaults           | Full set                                            |
-| Ads                                                  | Yes                | None                                                |
+| Feature                                              | Free              | Pro                           |
+| ---------------------------------------------------- | ----------------- | ----------------------------- |
+| 1v1 duels                                            | Unlimited         | Unlimited                     |
+| Solo runs                                            | Daily cap         | Unlimited                     |
+| **Exact match selection** (pick the precise fixture) | ✗                 | ✓                             |
+| Archive browse & search                              | ✗                 | ✓                             |
+| Practice mode (no lives, no timer)                   | ✗                 | ✓                             |
+| Post-game review                                     | Missed count only | Full XI + every player missed |
+| Private lobbies                                      | Join only         | Host + join                   |
 
 Private rooms are open to everyone at launch; hosting as a Pro feature is a later decision.
 

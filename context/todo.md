@@ -74,8 +74,8 @@ Trial the chosen source (API-Football, or a site such as mackolik.com, after che
 
 Not phases yet — promoted into a part above only when scoped.
 
-- Monetization: Pro subscription, remove-ads IAP, rewarded video, interstitials, RevenueCat entitlements
-- Compliance for ads: consent platform, App Tracking Transparency, minors and COPPA decision
+- Monetization: Pro subscription, RevenueCat entitlements
+- Compliance: minors and COPPA decision
 - Leaderboards, friend invites and private lobbies, ranked ELO, daily challenge, achievements
-- Pro solo features: exact match selection, archive browse, filter presets, practice mode, full post-game review
-- Social sharing, push notifications, spectating, new league and season packs
+- Pro solo features: exact match selection, archive browse, practice mode, full post-game review
+- Social sharing, push notifications, spectating

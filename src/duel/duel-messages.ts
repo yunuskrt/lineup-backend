@@ -11,6 +11,7 @@ export const ROOM_MESSAGES = {
   noRoom: 'No open room has that code.',
   ownRoom: "That's your own room.",
   hosting: 'You have a room open. Close it to join the queue.',
+  proToHost: 'Hosting a room needs Pro. Anyone can join one.',
 } as const;
 
 // The mock's wording, which the web already shows

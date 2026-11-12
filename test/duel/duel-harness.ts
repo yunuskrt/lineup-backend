@@ -9,6 +9,7 @@ import { RANDOM } from '@/common/random.js';
 import { ENV } from '@/config/config.module.js';
 import type { Env } from '@/config/env.schema.js';
 import { loadEnv } from '@/config/load-env.js';
+import type { Tier } from '@/contract/common.js';
 import {
   duelEventSchemas,
   type DuelSession,
@@ -135,10 +136,17 @@ export class DuelHarness {
     return Date.now() + this.skewMs;
   }
 
-  async client(): Promise<Client> {
+  // Stored tier: R10 reads it at room:create
+  async client(tier: Tier = 'free'): Promise<Client> {
     const guest = await connectGuest(this.server, this.url);
     this.guestIds.add(guest.id);
+    // A new guest is stored free already
+    if (tier !== 'free') await this.setTier(guest, tier);
     return this.track(guest, guest.socket);
+  }
+
+  async setTier({ id }: { id: string }, tier: Tier): Promise<void> {
+    await this.prisma.user.update({ where: { id }, data: { tier } });
   }
 
   // The same guest, on a new socket and token
@@ -192,9 +200,9 @@ export class DuelHarness {
     return (await created).code;
   }
 
-  // a creates, b joins in lowercase: a holds seat 0
+  // Pro a creates at seat 0; Free b joins lowercase
   async pairByRoom(): Promise<PairedDuel & { code: string }> {
-    const [a, b] = await Promise.all([this.client(), this.client()]);
+    const [a, b] = await Promise.all([this.client('pro'), this.client()]);
     const code = await this.createRoom(a);
     const aReady = nextEvent<DuelSession>(a.socket, 'matchReady');
     const bReady = nextEvent(b.socket, 'matchReady');

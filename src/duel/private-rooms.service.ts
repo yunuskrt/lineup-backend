@@ -1,4 +1,5 @@
 import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common';
+import { TierService } from '@/auth/tier.service.js';
 import { ApiException } from '@/common/api-exception.js';
 import { CLOCK, type Clock } from '@/common/clock.js';
 import type { User } from '@/contract/auth.js';
@@ -47,6 +48,7 @@ export class PrivateRoomsService implements OnModuleDestroy {
     private readonly notifier: DuelNotifier,
     private readonly start: DuelStartService,
     private readonly selector: MatchSelectorService,
+    private readonly tiers: TierService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(ROOM_WAIT) private readonly waitMs: number,
     @Inject(ROOM_CODE_PICK) private readonly pick: Pick,
@@ -58,6 +60,12 @@ export class PrivateRoomsService implements OnModuleDestroy {
 
   // socketId: the socket that sent the command
   async create(user: User, filters: Filters, socketId: string): Promise<void> {
+    // R10: first, and fresh; joining stays open
+    if ((await this.tiers.effectiveTierOf(user.id)) !== 'pro') {
+      throw new ApiException('forbidden', ROOM_MESSAGES.proToHost, {
+        reason: 'pro_required',
+      });
+    }
     this.assertFree(user.id);
     // Checked now: a friend never joins an empty room
     const emptyBecause = await this.selector.check(filters);

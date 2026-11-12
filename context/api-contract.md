@@ -431,7 +431,7 @@ Every command is acked with the §2 envelope, `data` empty. **Outcomes arrive as
 | `submitFilters(filters)` | `filters:submit` | `Filters` | `forbidden` (filters not open), `invalid_input`, `empty_pool` + `emptyBecause` (refused before the coin flip) |
 | `guess(request)` | `duel:guess` | `{ sessionId, guess }` (guess trimmed, 1–64) | `invalid_input`, `session_over`, `forbidden` (not your turn), `rate_limited` + `retryAfterMs` |
 | `forfeit()` | `duel:forfeit` | — | `forbidden` (no duel running) |
-| `createRoom(filters)` | `room:create` | `Filters` | `forbidden` (queued, already hosting a room, or in a duel), `invalid_input`, `empty_pool` + `emptyBecause` (checked now; nothing is stored) |
+| `createRoom(filters)` | `room:create` | `Filters` | `forbidden` + `reason: 'pro_required'` (R10: a Free host while `PRO_ENABLED` is on; checked first), `forbidden` (queued, already hosting a room, or in a duel), `invalid_input`, `empty_pool` + `emptyBecause` (checked now; nothing is stored) |
 | `joinRoom(code)` | `room:join` | `RoomJoinRequest` | `not_found` (no open room has that code: wrong, expired, left or already joined), `forbidden` (your own room, or you're queued, hosting or in a duel), `invalid_input` (not 6 characters of the code alphabet) |
 | `leaveRoom()` | `room:leave` | — | `forbidden` (not hosting an open room) |
 | `disconnect()` | socket close | — | — |
@@ -511,7 +511,8 @@ Every command is acked with the §2 envelope, `data` empty. **Outcomes arrive as
 
 ### Private rooms (R6)
 
-- **A second way to pair.** The creator sends `room:create` with their filters and gets `roomCreated` with a code. The friend sends `room:join` with it. Anyone may create or join, guests included.
+- **A second way to pair.** The creator sends `room:create` with their filters and gets `roomCreated` with a code. The friend sends `room:join` with it. Anyone may join, guests included.
+- **Hosting needs Pro** (R10) while `PRO_ENABLED` is on: a Free `room:create` gets `forbidden`, `reason: 'pro_required'`, "Hosting a room needs Pro. Anyone can join one.", and nothing is stored. The tier is read from the database at the command, so a change applies without reconnecting. With the switch off, everyone may host. Joining is never gated, and an open room stays open if its host's tier drops while it waits.
 - **On join:** `paired` to both at once, then `coinFlip` with `source: 'room'` (`winner` is the creator, `filters` are the room's), then `matchReady` 2 s later. There is no filter window and no `filtersUpdated`. Everything from `matchReady` on is the duel above.
 - **The joiner names first:** the flip's loser always starts, and in a room the creator is the winner.
 - **The code:** 6 characters, no `0 O 1 I L`, unique among open rooms. A room is open until someone joins, the creator leaves, the creator's socket closes or is taken over (at once, with no reconnect window), or 10 minutes pass (`roomExpired`). `expiresAt` is for showing the time left; the server decides the expiry.

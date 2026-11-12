@@ -291,7 +291,7 @@ describe('Duel harness: four whole games (e2e)', () => {
     await expectPrivate(g, false);
   });
 
-  it('plays a private room game: the joiner names first, to a draw', async () => {
+  it('plays a room game: a Pro host, a Free joiner, to a draw', async () => {
     const duel = await h.pairByRoom();
     const g: Game = { ...duel, squad: await h.squadOf(duel.match) };
     const before = (client: Client) =>
@@ -323,11 +323,16 @@ describe('Duel harness: four whole games (e2e)', () => {
     await expectHistory(g, g.a, g.b);
     await expectPrivate(g, true);
     // Counted like any duel: fresh guests, one draw
-    for (const client of [g.a, g.b]) {
+    for (const [client, tier] of [
+      [g.a, 'pro'],
+      [g.b, 'free'],
+    ] as const) {
       const res = await request(h.server)
         .get('/profile')
         .set('Cookie', client.cookie);
-      expect(profileSchema.parse(res.body.data).stats).toMatchObject({
+      const profile = profileSchema.parse(res.body.data);
+      expect(profile.user.tier).toBe(tier);
+      expect(profile.stats).toMatchObject({
         played: 1,
         wins: 0,
         losses: 0,
@@ -344,7 +349,7 @@ describe('Duel harness: four whole games (e2e)', () => {
   });
 
   it('closes a room its creator leaves, freeing them for the queue', async () => {
-    const [a, b] = await Promise.all([h.client(), h.client()]);
+    const [a, b] = await Promise.all([h.client('pro'), h.client()]);
     const code = await h.createRoom(a);
     expect(await h.ack(a, 'queue:enter')).toMatchObject({
       success: false,
@@ -367,7 +372,7 @@ describe('Duel harness: four whole games (e2e)', () => {
   });
 
   it("closes a room at once when its creator's socket closes", async () => {
-    const [a, b] = await Promise.all([h.client(), h.client()]);
+    const [a, b] = await Promise.all([h.client('pro'), h.client()]);
     const code = await h.createRoom(a);
     await h.drop(a);
     expect(await h.ack(b, 'room:join', { code })).toMatchObject({

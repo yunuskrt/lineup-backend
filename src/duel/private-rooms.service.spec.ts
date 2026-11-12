@@ -1,6 +1,8 @@
+import type { TierService } from '@/auth/tier.service.js';
 import { ApiException } from '@/common/api-exception.js';
 import type { Clock } from '@/common/clock.js';
 import type { User } from '@/contract/auth.js';
+import type { Tier } from '@/contract/common.js';
 import { ROOM_WAIT_MS } from '@/contract/constants.js';
 import type { DuelEventMap } from '@/contract/duel.js';
 import type { Filters } from '@/contract/match.js';
@@ -45,6 +47,13 @@ function setup() {
   const duels = new DuelRooms();
   const start = { openFlipped: vi.fn() };
   const selector = { check: vi.fn().mockResolvedValue(null) };
+  // Pro unless a case sets otherwise
+  const stored = new Map<string, Tier>();
+  const tiers = {
+    effectiveTierOf: vi.fn((id: string) =>
+      Promise.resolve(stored.get(id) ?? 'pro'),
+    ),
+  };
   let draws = 0;
   const pick = () => Math.floor(draws++ / 6) % 31;
   const service = new PrivateRoomsService(
@@ -54,6 +63,7 @@ function setup() {
     notifier,
     start as unknown as DuelStartService,
     selector as unknown as MatchSelectorService,
+    tiers as unknown as TierService,
     clock,
     ROOM_WAIT_MS,
     pick,
@@ -75,6 +85,8 @@ function setup() {
     duels,
     start,
     selector,
+    stored,
+    tiers,
     service,
     create,
     eventsOf,
@@ -125,6 +137,33 @@ describe('PrivateRoomsService', () => {
       });
       expect(ctx.service.isHosting('a')).toBe(false);
       expect(ctx.sent).toEqual([]);
+    });
+
+    it('refuses a Free creator with pro_required, storing nothing', async () => {
+      const ctx = setup();
+      ctx.stored.set('a', 'free');
+      expect(await refusal(() => ctx.create('a'))).toEqual({
+        code: 'forbidden',
+        message: ROOM_MESSAGES.proToHost,
+        retryAfterMs: null,
+        reason: 'pro_required',
+      });
+      expect(ctx.tiers.effectiveTierOf).toHaveBeenCalledWith('a');
+      expect(ctx.selector.check).not.toHaveBeenCalled();
+      expect(ctx.service.isHosting('a')).toBe(false);
+      expect(ctx.sent).toEqual([]);
+      await vi.advanceTimersByTimeAsync(ROOM_WAIT_MS);
+      expect(ctx.sent).toEqual([]);
+    });
+
+    it('reads the tier at each create, before the other checks', async () => {
+      const ctx = setup();
+      await ctx.create('a');
+      ctx.stored.set('a', 'free');
+      expect(await refusal(() => ctx.create('a'))).toMatchObject({
+        reason: 'pro_required',
+      });
+      expect(ctx.tiers.effectiveTierOf).toHaveBeenCalledTimes(2);
     });
 
     it('refuses a creator who already hosts a room', async () => {
@@ -226,6 +265,19 @@ describe('PrivateRoomsService', () => {
       });
       expect(ctx.start.openFlipped).toHaveBeenCalledExactlyOnceWith(duel);
       expect(ctx.service.isHosting('a')).toBe(false);
+    });
+
+    it("keeps a room open when its host's tier drops", async () => {
+      const ctx = setup();
+      await ctx.create('a');
+      ctx.stored.set('a', 'free');
+      ctx.stored.set('b', 'free');
+      ctx.service.join(user('b'), 'AAAAAA');
+      expect(ctx.duels.roomOf('b')?.players.map((p) => p.id)).toEqual([
+        'a',
+        'b',
+      ]);
+      expect(ctx.tiers.effectiveTierOf).toHaveBeenCalledExactlyOnceWith('a');
     });
 
     it('is not_found for a wrong code', async () => {

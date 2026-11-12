@@ -31,7 +31,12 @@ const row = (id: string, teams = [team('home'), team('away')]) => ({
 });
 
 function serviceWith(includeUnscored: boolean) {
-  const prisma = { match: { findMany: vi.fn().mockResolvedValue([]) } };
+  const prisma = {
+    match: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+  };
   const env = { MATCH_POOL_INCLUDE_UNSCORED: includeUnscored } as Env;
   const service = new MatchSelectorService(
     prisma as unknown as PrismaService,
@@ -160,4 +165,45 @@ describe('MatchSelectorService', () => {
       service.check({ ...ALL, era: { from: 2020, to: 2025 } }),
     ).resolves.toBe('era');
   });
+});
+
+describe('MatchSelectorService.isPlayable (R13)', () => {
+  const ID = '0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
+
+  it('reads that one match under the pool, never the showcase', async () => {
+    const { prisma, service } = serviceWith(false);
+    prisma.match.findFirst.mockResolvedValue(row(ID));
+
+    expect(await service.isPlayable(ID)).toBe(true);
+    expect(prisma.match.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [{ id: ID }, poolWhere(false, [LANDING_SHOWCASE.matchSlug])],
+        },
+      }),
+    );
+  });
+
+  it('is false for a match outside the pool', async () => {
+    const { service } = serviceWith(false);
+    expect(await service.isPlayable(ID)).toBe(false);
+  });
+
+  it.each([
+    ['10 starters on one side', [team('home'), team('away', 10)]],
+    ['a null formation', [team('home'), team('away', 11, null)]],
+  ])('is false with %s', async (_, teams) => {
+    const { prisma, service } = serviceWith(false);
+    prisma.match.findFirst.mockResolvedValue(row(ID, teams));
+    expect(await service.isPlayable(ID)).toBe(false);
+  });
+
+  it.each(['m1', '', 'not-a-uuid', `${ID}x`])(
+    'is false for %j, with no query',
+    async (id) => {
+      const { prisma, service } = serviceWith(false);
+      expect(await service.isPlayable(id)).toBe(false);
+      expect(prisma.match.findFirst).not.toHaveBeenCalled();
+    },
+  );
 });

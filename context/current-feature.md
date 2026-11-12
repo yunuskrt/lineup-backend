@@ -68,3 +68,4 @@ Not Started
 - R10 Room Hosting Gate: room:create needs Pro, fresh tier read, join open
 - R11 Solo Daily Cap: 5 Free runs a UTC day, in-memory count, /allowance
 - R12 Match Archive: GET /catalog/matches, in-memory word search, @ProGated
+- R13 Exact Match Selection: matchId on solo start, Pro only, isPlayable

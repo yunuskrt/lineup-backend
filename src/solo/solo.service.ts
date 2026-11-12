@@ -14,6 +14,7 @@ import type {
   SoloGuessResponse,
   SoloMatchOffer,
   SoloSession,
+  SoloStartRequest,
   SoloSummary,
 } from '@/contract/solo.js';
 import {
@@ -52,6 +53,8 @@ export const SOLO_MESSAGES = {
   roundOver: 'That round had already ended.',
   stillPlaying: 'The run is still in progress.',
   notAllowed: 'That is not allowed in a solo run.',
+  proToPick: 'Picking a match needs Pro.',
+  notInGame: "That match isn't in the game.",
   dailyCap: `You've played your ${SOLO_DAILY_RUNS} solo runs today. Duels are unlimited.`,
 } as const;
 
@@ -81,19 +84,26 @@ export class SoloService {
     @Inject(ENV) private readonly env: Env,
   ) {}
 
-  async start(user: User, filters: Filters): Promise<SoloMatchOffer> {
+  async start(
+    user: User,
+    { matchId, ...filters }: SoloStartRequest,
+  ): Promise<SoloMatchOffer> {
+    // R13: before the cap, whatever Free's count
+    if (matchId !== undefined && user.tier !== 'pro') {
+      throw new ApiException('forbidden', SOLO_MESSAGES.proToPick, {
+        reason: 'pro_required',
+      });
+    }
     // First: a refusal ends no run and picks no match
     if (user.tier === 'free') {
       const at = this.clock.now();
       this.assertUnderCap(user, await this.savedToday(user.id, at), at);
     }
-    const selection = await this.selector.select(filters);
-    if ('emptyBecause' in selection) {
-      throw new ApiException('empty_pool', SOLO_MESSAGES.emptyPool, {
-        emptyBecause: selection.emptyBecause,
-      });
-    }
-    const match = await this.identityOf(selection.matchId);
+    const match = await this.identityOf(
+      matchId === undefined
+        ? await this.pick(filters)
+        : await this.picked(matchId),
+    );
 
     const now = this.clock.now();
     await this.endOpenRun(user.id, now);
@@ -219,6 +229,24 @@ export class SoloService {
     } finally {
       this.isSweeping = false;
     }
+  }
+
+  private async pick(filters: Filters): Promise<string> {
+    const selection = await this.selector.select(filters);
+    if ('emptyBecause' in selection) {
+      throw new ApiException('empty_pool', SOLO_MESSAGES.emptyPool, {
+        emptyBecause: selection.emptyBecause,
+      });
+    }
+    return selection.matchId;
+  }
+
+  // Replays allowed: no check against history
+  private async picked(matchId: string): Promise<string> {
+    if (!(await this.selector.isPlayable(matchId))) {
+      throw new ApiException('not_found', SOLO_MESSAGES.notInGame);
+    }
+    return matchId;
   }
 
   // Saved since UTC midnight, by side pick time

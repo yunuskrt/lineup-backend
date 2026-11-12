@@ -7,7 +7,6 @@ import { RateLimit } from '@/common/rate-limits.js';
 import { ZodValidationPipe } from '@/common/zod-validation.pipe.js';
 import type { User } from '@/contract/auth.js';
 import { idSchema } from '@/contract/common.js';
-import { type Filters, filtersSchema } from '@/contract/match.js';
 import { componentRef } from '@/contract/openapi.js';
 import {
   type ChooseSideRequest,
@@ -20,6 +19,8 @@ import {
   soloMatchOfferSchema,
   type SoloSession,
   soloSessionSchema,
+  type SoloStartRequest,
+  soloStartRequestSchema,
   type SoloSummary,
   soloSummarySchema,
 } from '@/contract/solo.js';
@@ -34,14 +35,15 @@ export class SoloController {
 
   @Post()
   @RateLimit('start')
-  @ApiBody({ schema: { $ref: componentRef('Filters') } })
+  @ApiBody({ schema: { $ref: componentRef('SoloStartRequest') } })
   @DocumentsSession()
   @ContractResponse(soloMatchOfferSchema)
   start(
     @CurrentUser() user: User,
-    @Body(new ZodValidationPipe(filtersSchema)) filters: Filters,
+    @Body(new ZodValidationPipe(soloStartRequestSchema))
+    body: SoloStartRequest,
   ): Promise<SoloMatchOffer> {
-    return this.solo.start(user, filters);
+    return this.solo.start(user, body);
   }
 
   @Post(':sessionId/side')

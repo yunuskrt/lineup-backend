@@ -3,9 +3,11 @@ import {
   revealedPlayer,
   roundTiming,
 } from '@/contract/contract.fixtures.js';
+import { filtersSchema } from '@/contract/match.js';
 import {
   soloGuessRequestSchema,
   soloSessionSchema,
+  soloStartRequestSchema,
   soloSummarySchema,
 } from '@/contract/solo.js';
 
@@ -125,5 +127,38 @@ describe('soloSummarySchema found timings', () => {
       soloSummarySchema.safeParse({ ...summary, found: [revealedPlayer] })
         .success,
     ).toBe(false);
+  });
+});
+
+describe('soloStartRequestSchema (R13)', () => {
+  const FILTERS = {
+    competitionIds: [],
+    clubIds: [],
+    era: { from: 2000, to: 2025 },
+  };
+
+  it('takes the filters alone, as before', () => {
+    expect(soloStartRequestSchema.parse(FILTERS)).toEqual(FILTERS);
+  });
+
+  it('takes the filters with a matchId', () => {
+    expect(
+      soloStartRequestSchema.parse({ ...FILTERS, matchId: 'm-1' }),
+    ).toEqual({ ...FILTERS, matchId: 'm-1' });
+  });
+
+  it('refuses an empty matchId, or one without the filters', () => {
+    expect(
+      soloStartRequestSchema.safeParse({ ...FILTERS, matchId: '' }).success,
+    ).toBe(false);
+    expect(soloStartRequestSchema.safeParse({ matchId: 'm-1' }).success).toBe(
+      false,
+    );
+  });
+
+  it('is stripped from plain Filters, as duels parse them', () => {
+    expect(filtersSchema.parse({ ...FILTERS, matchId: 'm-1' })).toEqual(
+      FILTERS,
+    );
   });
 });

@@ -47,6 +47,7 @@ describe('contractRegistry', () => {
         'SoloAllowance',
         'ArchiveQuery',
         'ArchivePage',
+        'SoloStartRequest',
       ]),
     );
   });

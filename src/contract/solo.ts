@@ -11,6 +11,7 @@ import {
 import { SQUAD_SIZE } from '@/contract/constants.js';
 import {
   clubRefSchema,
+  filtersSchema,
   matchIdentitySchema,
   matchInPlaySchema,
 } from '@/contract/match.js';
@@ -34,6 +35,12 @@ const legacyClubSchema = (side: 'home' | 'away') =>
     deprecated: true,
     description: `Use match.${side}`,
   });
+
+// R13: with matchId, the filters are ignored
+export const soloStartRequestSchema = filtersSchema
+  .extend({ matchId: idSchema.optional() })
+  .register(contractRegistry, { id: 'SoloStartRequest' });
+export type SoloStartRequest = z.infer<typeof soloStartRequestSchema>;
 
 export const soloMatchOfferSchema = z
   .object({

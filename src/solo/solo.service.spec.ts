@@ -60,6 +60,7 @@ const MATCH_ROW = {
 function setup() {
   const clock: Clock & { at: number } = { at: T0, now: () => clock.at };
   const select = vi.fn().mockResolvedValue({ matchId: 'm-1' });
+  const isPlayable = vi.fn().mockResolvedValue(true);
   const load = vi.fn().mockResolvedValue(SQUAD);
   const findUniqueOrThrow = vi.fn().mockResolvedValue(MATCH_ROW);
   const store = new SoloSessionStore();
@@ -71,14 +72,24 @@ function setup() {
       match: { findUniqueOrThrow },
       gameSession: { findMany },
     } as unknown as PrismaService,
-    { select } as unknown as MatchSelectorService,
+    { select, isPlayable } as unknown as MatchSelectorService,
     { load } as unknown as SquadLoaderService,
     store,
     { save } as unknown as SoloPersistenceService,
     clock,
     {} as Env,
   );
-  return { service, clock, select, load, store, save, findMany };
+  return {
+    service,
+    clock,
+    select,
+    isPlayable,
+    findUniqueOrThrow,
+    load,
+    store,
+    save,
+    findMany,
+  };
 }
 
 // A started run with its side chosen at T0
@@ -465,6 +476,79 @@ describe('SoloService', () => {
 
       const summary = await ctx.service.summary(ctx.who, ctx.sessionId);
       expect(summary.missed).toEqual(SQUAD.players.slice(1));
+    });
+  });
+
+  describe('exact match (R13)', () => {
+    const PICKED = { ...FILTERS, matchId: 'm-1' };
+    // Filters that the stratified pick would refuse
+    const NARROW = { ...FILTERS, clubIds: ['nobody'], matchId: 'm-1' };
+    const pro = user('user-1', 'pro');
+
+    it('offers that exact match, whatever the filters say', async () => {
+      const ctx = setup();
+      const offer = await ctx.service.start(pro, NARROW);
+
+      expect(offer.match.id).toBe('m-1');
+      expect(ctx.isPlayable).toHaveBeenCalledWith('m-1');
+      expect(ctx.select).not.toHaveBeenCalled();
+      expect(ctx.findUniqueOrThrow).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'm-1' } }),
+      );
+    });
+
+    it('lets the same match be picked again', async () => {
+      const ctx = setup();
+      const first = await ctx.service.start(pro, PICKED);
+      await ctx.service.chooseSide(pro, first.sessionId, 'home');
+      await ctx.service.quit(pro, first.sessionId);
+
+      const again = await ctx.service.start(pro, PICKED);
+      expect(again.match.id).toBe('m-1');
+      expect(again.sessionId).not.toBe(first.sessionId);
+    });
+
+    it('refuses Free with pro_required, before the cap', async () => {
+      const ctx = setup();
+      const { sessionId } = await playing(ctx);
+      ctx.findMany.mockClear();
+
+      expect(await failureOf(() => ctx.service.start(user(), PICKED))).toEqual({
+        code: 'forbidden',
+        message: SOLO_MESSAGES.proToPick,
+        retryAfterMs: null,
+        reason: 'pro_required',
+      });
+      expect(ctx.findMany).not.toHaveBeenCalled();
+      expect(ctx.isPlayable).not.toHaveBeenCalled();
+      expect(ctx.store.activeOf('user-1')?.id).toBe(sessionId);
+    });
+
+    it('leaves Free without a matchId unchanged', async () => {
+      const ctx = setup();
+      await ctx.service.start(user(), FILTERS);
+      expect(ctx.select).toHaveBeenCalledWith(FILTERS);
+      expect(ctx.isPlayable).not.toHaveBeenCalled();
+    });
+
+    it('passes the filters on without the matchId', async () => {
+      const ctx = setup();
+      await ctx.service.start(pro, { ...FILTERS });
+      expect(ctx.select).toHaveBeenCalledWith(FILTERS);
+    });
+
+    it('is not_found for a match outside the game, keeping the run', async () => {
+      const ctx = setup();
+      const { sessionId } = await playing(ctx, pro);
+      ctx.isPlayable.mockResolvedValue(false);
+
+      expect(
+        await failureOf(() => ctx.service.start(pro, PICKED)),
+      ).toMatchObject({
+        code: 'not_found',
+        message: SOLO_MESSAGES.notInGame,
+      });
+      expect(ctx.store.activeOf('user-1')?.id).toBe(sessionId);
     });
   });
 

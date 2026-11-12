@@ -205,7 +205,7 @@ Paths are suggestions. Every response body is the envelope from §2, wrapping th
 | 5 | `auth.upgradeGuest` | `POST /auth/upgrade` | `UpgradeGuestRequest` | `Session` (same user id, `isGuest: false`) |
 | 6 | `auth.signOut` | `POST /auth/sign-out` | — | none (`data` empty) |
 | 7 | `catalog.getFilterOptions` | `GET /catalog/filter-options` | — | `FilterOptions` |
-| 8 | `solo.findMatch` | `POST /solo/sessions` | `Filters` | `SoloMatchOffer` |
+| 8 | `solo.findMatch` | `POST /solo/sessions` | `SoloStartRequest` (R13; `Filters` alone is still valid) | `SoloMatchOffer` |
 | 9 | `solo.chooseSide` | `POST /solo/sessions/:sessionId/side` | `{ side: Side }` | `SoloSession` |
 | 10 | `solo.guess` | `POST /solo/sessions/:sessionId/guesses` | `SoloGuessRequest` | `SoloGuessResponse` |
 | 11 | `solo.syncSession` | `GET /solo/sessions/:sessionId` | — | `SoloSession` |
@@ -228,6 +228,7 @@ Better Auth (B10) mounts its own routes. Calls 1–6 may map onto them rather th
 | `SignInRequest` | `email` (valid email), `password` (8–128 chars) |
 | `SignUpRequest` | `email`, `password` (8–128), `handle` (trimmed, 3–24 chars) |
 | `UpgradeGuestRequest` | same as `SignUpRequest` |
+| `SoloStartRequest` (R13) | Every `Filters` field, plus `matchId` (id), optional. With `matchId` the filters are ignored and that exact match is offered: Pro only (`forbidden` + `reason: 'pro_required'`, "Picking a match needs Pro.", checked before the daily cap), and it must be a match `GET /catalog/matches` can list (`not_found`, "That match isn't in the game.", for an unknown id, the showcase or any match outside the pool). Replays are allowed; the run is a normal run in history and stats. Duels never take it: `filters:submit` and `room:create` drop the key |
 | `SoloGuessRequest` | `sessionId` (id), `guess` (trimmed, 1–64 chars) |
 | `HistoryQuery` | `cursor` (id or `null`), `limit` (integer 1–50; web default 20) |
 | `ArchiveQuery` (R12) | All optional: `q` (trimmed, 1–64 chars), `competitionId` (id), `clubId` (id, either side), `from` and `to` (season starts 2000–2025, `from ≤ to`), `cursor` (opaque, from `nextCursor`), `limit` (integer 1–50, default 20) |
@@ -414,7 +415,7 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | `signIn` | `invalid_input` (bad form), `unauthorized` (wrong credentials) |
 | `signUp` | `invalid_input` (bad form, or **handle taken**) |
 | `upgradeGuest` | `invalid_input` (bad form, handle taken), `unauthorized` (no session), `forbidden` (already registered) |
-| `findMatch` | `unauthorized`, `invalid_input`, `empty_pool` + `emptyBecause`, `forbidden` + `reason: 'daily_cap'` + `retryAfterMs` (R11) |
+| `findMatch` | `unauthorized`, `invalid_input`, `empty_pool` + `emptyBecause`, `forbidden` + `reason: 'daily_cap'` + `retryAfterMs` (R11); with `matchId` (R13): `forbidden` + `reason: 'pro_required'`, `not_found` |
 | `chooseSide` | `not_found`, `forbidden` (side already chosen), `forbidden` + `reason: 'daily_cap'` + `retryAfterMs` (R11) |
 | `guess` | `invalid_input`, `not_found`, `session_over` (run over, or round already ended), `rate_limited` + `retryAfterMs` |
 | `syncSession`, `quit` | `not_found`, `invalid_input` (no side chosen yet) |

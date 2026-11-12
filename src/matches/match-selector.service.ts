@@ -17,6 +17,9 @@ import {
 import { SHOWCASE, type ShowcaseSpec } from '@/matches/showcase.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 
+// Any uuid: the id column refuses anything else
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Lineups are counted, never selected (HC 2)
 const CANDIDATE_SELECT = {
   id: true,
@@ -100,6 +103,21 @@ export class MatchSelectorService {
       orderBy: { id: 'asc' },
     });
     return rows.flatMap((row) => toCandidate(row) ?? []);
+  }
+
+  // R13: one match, under the pool's own rules
+  async isPlayable(matchId: string): Promise<boolean> {
+    if (!UUID.test(matchId)) return false;
+    const row = await this.prisma.match.findFirst({
+      where: {
+        AND: [
+          { id: matchId },
+          poolWhere(this.includeUnscored, this.excludedSlugs),
+        ],
+      },
+      select: CANDIDATE_SELECT,
+    });
+    return row !== null && toCandidate(row) !== null;
   }
 
   async select(

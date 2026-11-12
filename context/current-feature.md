@@ -70,3 +70,4 @@ Not Started
 - R12 Match Archive: GET /catalog/matches, in-memory word search, @ProGated
 - R13 Exact Match Selection: matchId on solo start, Pro only, isPlayable
 - R14 Practice Mode: no clock or life loss, never saved, 30-min idle drop
+- R15 Archive Without Nicknames: q skips match nickname, still sent

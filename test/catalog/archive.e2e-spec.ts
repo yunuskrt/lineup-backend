@@ -292,9 +292,11 @@ describe('The archive over a rolled-back pool (e2e)', () => {
         accentless: await ofQuery('atletico arsiv'),
         turkish: await ofQuery('SUPER ARSIV'),
         alias: await ofQuery('archive alias b'),
-        nickname: await ofQuery('archive night'),
         years: await ofQuery('arsiv 2005'),
+        // R15: a nickname is never a search word
+        nickname: await ofQuery('archive night'),
         missing: await ofQuery('missing'),
+        sent: (await archive.page({ q: 'arsiv 2005', limit: 50 })).entries,
       };
     });
 
@@ -305,11 +307,12 @@ describe('The archive over a rolled-back pool (e2e)', () => {
       result.accentless,
       result.turkish,
       result.alias,
-      result.nickname,
       result.years,
     ]) {
       expect(found).toEqual([result.ids.inId]);
     }
+    expect(result.nickname).toEqual([]);
     expect(result.missing).toEqual([]);
+    expect(result.sent[0]?.nickname).toBe('The Archive Night');
   });
 });

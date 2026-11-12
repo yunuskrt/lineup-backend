@@ -91,7 +91,7 @@ const idsOf = (q: Partial<ArchiveQuery>) =>
   archivePage(POOL, query(q))?.entries.map((e) => e.id);
 
 describe('archiveWords', () => {
-  it('reads clubs, aliases, competition, nickname and the years', () => {
+  it('reads clubs, aliases, competition and the years', () => {
     expect(archiveWords({ ...ISTANBUL, aliases: ALIASES })).toEqual(
       expect.arrayContaining([
         'ac',
@@ -101,13 +101,18 @@ describe('archiveWords', () => {
         'liverpool',
         'champions',
         'league',
-        'miracle',
-        'istanbul',
         '2004',
         '05',
         '2005',
       ]),
     );
+  });
+
+  it('leaves out the nickname (R15)', () => {
+    const words = archiveWords({ ...ISTANBUL, aliases: ALIASES });
+    expect(words).not.toContain('miracle');
+    expect(words).not.toContain('istanbul');
+    expect(words).not.toContain('of');
   });
 
   it('adds no next year to a tournament season', () => {
@@ -127,7 +132,6 @@ describe('archivePage search', () => {
     ['Turkish letters', 'fenerbahce', ['m-derby']],
     ['a Turkish competition', 'super lig', ['m-derby']],
     ['several words, each anywhere', 'milan 2005', ['m-istanbul']],
-    ['a nickname', 'istanbul', ['m-istanbul']],
     ['an alias', 'rossoneri', ['m-madrid', 'm-istanbul']],
     ['the start of a word', 'barc atl', []],
     ['upper case and accents in the query', 'ATLÉTICO', ['m-madrid']],
@@ -146,6 +150,29 @@ describe('archivePage search', () => {
 
   it('filters nothing for a query with no words', () => {
     expect(idsOf({ q: '!!!' })).toHaveLength(POOL.length);
+  });
+});
+
+describe('archivePage search without nicknames (R15)', () => {
+  it.each(['istanbul', 'miracle', 'miracle of istanbul', 'milan istanbul'])(
+    'never finds a match by its nickname: %s',
+    (q) => {
+      expect(idsOf({ q })).toEqual([]);
+    },
+  );
+
+  it.each([
+    ['its clubs', 'liverpool milan'],
+    ['an alias', 'rossoneri liverpool'],
+    ['its competition', 'champions league 2004'],
+    ['its season', '2004-05'],
+  ])('still finds it by %s', (_, q) => {
+    expect(idsOf({ q })).toEqual(['m-istanbul']);
+  });
+
+  it('still sends the nickname', () => {
+    const page = archivePage(POOL, query({ q: 'liverpool milan' }));
+    expect(page?.entries[0]?.nickname).toBe('Miracle of Istanbul');
   });
 });
 

@@ -27,12 +27,11 @@ function wordsOf(text: string | null): string[] {
   return text ? normalizeName(text).split(' ').filter(Boolean) : [];
 }
 
-// Every word a search may start with
+// Every search word; R15: not the nickname
 export function archiveWords(source: ArchiveSource): string[] {
   const { identity, seasonStart, aliases } = source;
   const texts = [
     identity.competition.name,
-    identity.nickname,
     identity.season,
     String(seasonStart),
     // 2004-05 is also 2005

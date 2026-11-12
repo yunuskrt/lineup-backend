@@ -328,7 +328,7 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | Order | Newest first by `date`, then by id. Never by memorability score |
 | `total` | Every match the query matches, across all pages |
 | Paging | Pass `nextCursor` back as `cursor`; `null` on the last page. No repeats or gaps. A cursor that isn't one of ours is `invalid_input` |
-| `q` | Normalized as guesses are (diacritics, Turkish letters, case), then split into words. **Every word must be the start of a word** in the match's text: both clubs' names, short names and aliases, the competition, the nickname, the season (`2004-05` also reads as `2004` and `2005`) and the match's year. "milan 2005" and "istanbul" both work; "barc" finds Barcelona; "ter" doesn't find Inter |
+| `q` | Normalized as guesses are (diacritics, Turkish letters, case), then split into words. **Every word must be the start of a word** in the match's text: both clubs' names, short names and aliases, the competition, the season (`2004-05` also reads as `2004` and `2005`) and the match's year. **Never the nickname** (R15), though `nickname` is still sent. "milan 2005" works; "barc" finds Barcelona; "ter" doesn't find Inter; "istanbul" doesn't find the Miracle of Istanbul |
 | Never sent | Lineups, players, sides, formations, memorability scores |
 | Freshness | The server keeps its index 5 minutes |
 | Rate limit | `catalog` (60 a minute) |

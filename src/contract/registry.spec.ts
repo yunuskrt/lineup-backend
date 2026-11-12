@@ -44,6 +44,7 @@ describe('contractRegistry', () => {
         'ShowcasePlayer',
         'AppConfig',
         'ForbiddenReason',
+        'SoloAllowance',
       ]),
     );
   });

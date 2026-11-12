@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { SYSTEM_CLOCK } from '@/common/clock.js';
 import { MatchesModule } from '@/matches/matches.module.js';
+import { AllowanceController } from '@/solo/allowance.controller.js';
 import { SoloPersistenceService } from '@/solo/solo-persistence.service.js';
 import { SoloController } from '@/solo/solo.controller.js';
 import { SoloService } from '@/solo/solo.service.js';
@@ -15,7 +16,7 @@ export const SWEEP_EVERY_MS = 60_000;
 
 @Module({
   imports: [MatchesModule],
-  controllers: [SoloController],
+  controllers: [SoloController, AllowanceController],
   providers: [
     SoloService,
     SoloSessionStore,

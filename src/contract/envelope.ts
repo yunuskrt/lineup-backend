@@ -37,11 +37,13 @@ export const apiErrorSchema = z
     emptyBecause: emptyPoolReasonSchema.optional(),
     reason: forbiddenReasonSchema.optional(),
   })
+  // R11: the cap's refusal waits for midnight
   .refine(
     (error) =>
-      (error.code === 'rate_limited') === (error.retryAfterMs !== null),
+      (error.code === 'rate_limited' || error.reason === 'daily_cap') ===
+      (error.retryAfterMs !== null),
     {
-      error: 'retryAfterMs is set only with rate_limited',
+      error: 'retryAfterMs is set only with rate_limited or daily_cap',
       path: ['retryAfterMs'],
     },
   )

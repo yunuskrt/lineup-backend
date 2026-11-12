@@ -66,3 +66,4 @@ Not Started
 - R8 Showcase Reveals: +Ramos, Navas, Marcelo; reveals 8,10,9,7,5,2,0,4
 - R9 Pro Tier & Switch: users.tier, PRO_ENABLED, GET /config, reason
 - R10 Room Hosting Gate: room:create needs Pro, fresh tier read, join open
+- R11 Solo Daily Cap: 5 Free runs a UTC day, in-memory count, /allowance

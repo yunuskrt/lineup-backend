@@ -19,6 +19,9 @@ export const LAST_SEASON_START = 2025;
 
 export const TOP_CLUBS_LIMIT = 12;
 
+// R11: Free solo runs per UTC day
+export const SOLO_DAILY_RUNS = 5;
+
 // No 0 O 1 I L: nothing to misread
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const ROOM_CODE_LENGTH = 6;

@@ -30,17 +30,33 @@ describe('apiErrorSchema', () => {
 
   it('takes an optional reason with forbidden, and only then', () => {
     const refused = error({ code: 'forbidden', message: 'That needs Pro.' });
-    for (const reason of ['pro_required', 'daily_cap']) {
-      expect(apiErrorSchema.safeParse({ ...refused, reason }).success).toBe(
-        true,
-      );
-    }
+    expect(
+      apiErrorSchema.safeParse({ ...refused, reason: 'pro_required' }).success,
+    ).toBe(true);
     expect(apiErrorSchema.safeParse(refused).success).toBe(true);
     expect(
       apiErrorSchema.safeParse({ ...refused, reason: 'banned' }).success,
     ).toBe(false);
     expect(
       apiErrorSchema.safeParse(error({ reason: 'pro_required' })).success,
+    ).toBe(false);
+  });
+
+  it('requires retryAfterMs with daily_cap, and only with it (R11)', () => {
+    const capped = error({
+      code: 'forbidden',
+      reason: 'daily_cap',
+      retryAfterMs: 3_600_000,
+    });
+    expect(apiErrorSchema.safeParse(capped).success).toBe(true);
+    expect(
+      apiErrorSchema.safeParse({ ...capped, retryAfterMs: null }).success,
+    ).toBe(false);
+    expect(
+      apiErrorSchema.safeParse({ ...capped, reason: 'pro_required' }).success,
+    ).toBe(false);
+    expect(
+      apiErrorSchema.safeParse({ ...capped, reason: undefined }).success,
     ).toBe(false);
   });
 

@@ -6,8 +6,10 @@ import { ENV } from '@/config/config.module.js';
 import type { Env } from '@/config/env.schema.js';
 import type { User } from '@/contract/auth.js';
 import type { Side } from '@/contract/common.js';
+import { SOLO_DAILY_RUNS } from '@/contract/constants.js';
 import type { Filters, MatchIdentity } from '@/contract/match.js';
 import type {
+  SoloAllowance,
   SoloGuessRequest,
   SoloGuessResponse,
   SoloMatchOffer,
@@ -29,6 +31,7 @@ import { MatchSelectorService } from '@/matches/match-selector.service.js';
 import { SquadLoaderService } from '@/matches/squad-loader.service.js';
 import { toGuessResult } from '@/matches/squad-views.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
+import { isCapped, soloAllowance, utcDayStart } from '@/solo/daily-cap.js';
 import { SoloPersistenceService } from '@/solo/solo-persistence.service.js';
 import {
   isOver,
@@ -49,6 +52,7 @@ export const SOLO_MESSAGES = {
   roundOver: 'That round had already ended.',
   stillPlaying: 'The run is still in progress.',
   notAllowed: 'That is not allowed in a solo run.',
+  dailyCap: `You've played your ${SOLO_DAILY_RUNS} solo runs today. Duels are unlimited.`,
 } as const;
 
 // Never echoes the guess (HC 2)
@@ -78,6 +82,11 @@ export class SoloService {
   ) {}
 
   async start(user: User, filters: Filters): Promise<SoloMatchOffer> {
+    // First: a refusal ends no run and picks no match
+    if (user.tier === 'free') {
+      const at = this.clock.now();
+      this.assertUnderCap(user, await this.savedToday(user.id, at), at);
+    }
     const selection = await this.selector.select(filters);
     if ('emptyBecause' in selection) {
       throw new ApiException('empty_pool', SOLO_MESSAGES.emptyPool, {
@@ -115,10 +124,16 @@ export class SoloService {
   ): Promise<SoloSession> {
     const offer = this.offerOf(sessionId, user);
     const squad = await this.squads.load(offer.match.id, side);
+    // Last await: then count and claim as one step
+    const saved =
+      user.tier === 'free'
+        ? await this.savedToday(user.id, this.clock.now())
+        : [];
     // A concurrent call may have taken it meanwhile
     this.offerOf(sessionId, user);
 
     const now = this.clock.now();
+    this.assertUnderCap(user, saved, now);
     const timed = createTimedGame({ mode: 'solo', squad: squad.entries }, now);
     // A new game always has round 1 running
     const firstRound = timed.round!;
@@ -180,6 +195,12 @@ export class SoloService {
     return toSoloSummary(run, user.tier);
   }
 
+  async allowance(user: User): Promise<SoloAllowance> {
+    const now = this.clock.now();
+    const saved = await this.savedToday(user.id, now);
+    return soloAllowance(user.tier, this.usedToday(user.id, saved, now), now);
+  }
+
   // Ends abandoned runs, saves them, frees memory
   async sweep(): Promise<void> {
     if (this.isSweeping) return;
@@ -198,6 +219,46 @@ export class SoloService {
     } finally {
       this.isSweeping = false;
     }
+  }
+
+  // Saved since UTC midnight, by side pick time
+  private async savedToday(userId: string, now: number): Promise<string[]> {
+    const rows = await this.prisma.gameSession.findMany({
+      where: {
+        mode: 'solo',
+        startedAt: { gte: new Date(utcDayStart(now)) },
+        participants: { some: { userId } },
+      },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  // Sync: the side pick counts and claims at once
+  private usedToday(
+    userId: string,
+    saved: readonly string[],
+    now: number,
+  ): number {
+    const since = utcDayStart(now);
+    const ids = new Set(saved);
+    for (const run of this.store.played()) {
+      if (run.userId === userId && run.firstRound.startedAt >= since) {
+        ids.add(run.id);
+      }
+    }
+    return ids.size;
+  }
+
+  private assertUnderCap(user: User, saved: readonly string[], now: number) {
+    if (user.tier !== 'free') return;
+    const used = this.usedToday(user.id, saved, now);
+    const allowance = soloAllowance(user.tier, used, now);
+    if (!isCapped(allowance)) return;
+    throw new ApiException('forbidden', SOLO_MESSAGES.dailyCap, {
+      reason: 'daily_cap',
+      retryAfterMs: allowance.resetsAt - now,
+    });
   }
 
   private async identityOf(matchId: string): Promise<MatchIdentity> {

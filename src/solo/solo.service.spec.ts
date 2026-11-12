@@ -64,8 +64,13 @@ function setup() {
   const findUniqueOrThrow = vi.fn().mockResolvedValue(MATCH_ROW);
   const store = new SoloSessionStore();
   const save = vi.fn().mockResolvedValue(true);
+  // Saved runs' ids, as R11's count reads them
+  const findMany = vi.fn().mockResolvedValue([]);
   const service = new SoloService(
-    { match: { findUniqueOrThrow } } as unknown as PrismaService,
+    {
+      match: { findUniqueOrThrow },
+      gameSession: { findMany },
+    } as unknown as PrismaService,
     { select } as unknown as MatchSelectorService,
     { load } as unknown as SquadLoaderService,
     store,
@@ -73,7 +78,7 @@ function setup() {
     clock,
     {} as Env,
   );
-  return { service, clock, select, load, store, save };
+  return { service, clock, select, load, store, save, findMany };
 }
 
 // A started run with its side chosen at T0
@@ -460,6 +465,140 @@ describe('SoloService', () => {
 
       const summary = await ctx.service.summary(ctx.who, ctx.sessionId);
       expect(summary.missed).toEqual(SQUAD.players.slice(1));
+    });
+  });
+
+  describe('daily cap (R11)', () => {
+    // T0 is on day 0: the next UTC midnight is a day
+    const MIDNIGHT = 86_400_000;
+    const CAPPED = {
+      code: 'forbidden',
+      message: SOLO_MESSAGES.dailyCap,
+      retryAfterMs: MIDNIGHT - T0,
+      reason: 'daily_cap',
+    };
+
+    // Each run: offered, side picked, quit
+    async function runs(
+      ctx: ReturnType<typeof setup>,
+      n: number,
+      who = user(),
+    ) {
+      const ids: string[] = [];
+      for (let i = 0; i < n; i += 1) {
+        const { sessionId } = await ctx.service.start(who, FILTERS);
+        await ctx.service.chooseSide(who, sessionId, 'home');
+        await ctx.service.quit(who, sessionId);
+        ids.push(sessionId);
+      }
+      return ids;
+    }
+
+    it('refuses the sixth start, waiting for midnight', async () => {
+      const ctx = setup();
+      await runs(ctx, 5);
+      ctx.select.mockClear();
+
+      expect(await failureOf(() => ctx.service.start(user(), FILTERS))).toEqual(
+        CAPPED,
+      );
+      expect(ctx.select).not.toHaveBeenCalled();
+    });
+
+    it('keeps the open run when the start is refused', async () => {
+      const ctx = setup();
+      await runs(ctx, 4);
+      const { sessionId } = await ctx.service.start(user(), FILTERS);
+      await ctx.service.chooseSide(user(), sessionId, 'home');
+
+      await failureOf(() => ctx.service.start(user(), FILTERS));
+      expect(ctx.store.activeOf('user-1')?.id).toBe(sessionId);
+    });
+
+    it('opens again after UTC midnight', async () => {
+      const ctx = setup();
+      await runs(ctx, 5);
+      ctx.clock.at = MIDNIGHT;
+
+      await expect(ctx.service.start(user(), FILTERS)).resolves.toBeDefined();
+      expect((await ctx.service.allowance(user())).used).toBe(0);
+    });
+
+    it('never refuses Pro, and never queries for it', async () => {
+      const ctx = setup();
+      const pro = user('user-1', 'pro');
+      await runs(ctx, 6, pro);
+      ctx.findMany.mockClear();
+
+      await expect(ctx.service.start(pro, FILTERS)).resolves.toBeDefined();
+      expect(ctx.findMany).not.toHaveBeenCalled();
+    });
+
+    it('counts a side pick, never an offer alone', async () => {
+      const ctx = setup();
+      await runs(ctx, 4);
+      await ctx.service.start(user(), FILTERS);
+
+      await expect(ctx.service.start(user(), FILTERS)).resolves.toBeDefined();
+      expect((await ctx.service.allowance(user())).used).toBe(4);
+    });
+
+    it('counts a saved run and its copy in memory once', async () => {
+      const ctx = setup();
+      const ids = await runs(ctx, 2);
+      ctx.findMany.mockResolvedValue(
+        [...ids, 'evicted-run'].map((id) => ({ id })),
+      );
+
+      expect(await ctx.service.allowance(user())).toEqual({
+        limit: 5,
+        used: 3,
+        resetsAt: MIDNIGHT,
+      });
+      expect(ctx.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            mode: 'solo',
+            startedAt: { gte: new Date(0) },
+            participants: { some: { userId: 'user-1' } },
+          },
+        }),
+      );
+    });
+
+    it('lets one of two side picks at 4 used take the fifth', async () => {
+      const ctx = setup();
+      await runs(ctx, 4);
+      const { sessionId } = await ctx.service.start(user(), FILTERS);
+      // As if two tabs each hold an offer
+      const offer = ctx.store.get(sessionId, 'user-1');
+      if (!offer) throw new Error('No offer');
+      ctx.store.save({ ...offer, id: 'second-tab' });
+
+      const results = await Promise.allSettled([
+        ctx.service.chooseSide(user(), sessionId, 'home'),
+        ctx.service.chooseSide(user(), 'second-tab', 'away'),
+      ]);
+
+      expect(results.map((r) => r.status).sort()).toEqual([
+        'fulfilled',
+        'rejected',
+      ]);
+      const refused = results.find((r) => r.status === 'rejected');
+      if (!refused) throw new Error('Expected one refusal');
+      expect((refused.reason as ApiException).error).toEqual(CAPPED);
+      expect((await ctx.service.allowance(user())).used).toBe(5);
+    });
+
+    it('reports a null limit for Pro', async () => {
+      const ctx = setup();
+      await runs(ctx, 1, user('user-1', 'pro'));
+
+      expect(await ctx.service.allowance(user('user-1', 'pro'))).toEqual({
+        limit: null,
+        used: 1,
+        resetsAt: MIDNIGHT,
+      });
     });
   });
 

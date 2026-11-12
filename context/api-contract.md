@@ -35,7 +35,7 @@ A plain-text transcription of what `lineup-web` sends and expects today, taken f
 | --- | --- | --- |
 | `code` | `ApiErrorCode` | See below |
 | `message` | string | Non-empty, safe to show the player. No stack traces, SQL or provider text. |
-| `retryAfterMs` | integer ≥ 0, or `null` | Set with `rate_limited`; `null` otherwise. |
+| `retryAfterMs` | integer ≥ 0, or `null` | Set with `rate_limited`, and with `forbidden` + `reason: 'daily_cap'` (R11: the wait until the next UTC midnight); `null` otherwise. |
 | `emptyBecause` | `EmptyPoolReason`, optional | Present **only** with `empty_pool`. |
 | `reason` | `ForbiddenReason`, optional | Only ever with `forbidden` (R9), and optional there: most refusals have none. |
 
@@ -216,6 +216,7 @@ Paths are suggestions. Every response body is the envelope from §2, wrapping th
 | 16 | `catalog.getPlayerDirectory` | `GET /catalog/players` | — | `PlayerDirectory` (R5), or `304` with no body |
 | 17 | `catalog.getOverview` | `GET /catalog/overview` | — | `CatalogOverview` (R7). Public: no session needed |
 | 18 | `config.getConfig` | `GET /config` | — | `AppConfig` (R9). Public: no session needed |
+| 19 | `solo.getAllowance` | `GET /solo/allowance` | — | `SoloAllowance` (R11) |
 
 Better Auth (B10) mounts its own routes. Calls 1–6 may map onto them rather than onto these paths; the web only needs the shapes.
 
@@ -316,6 +317,16 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | --- | --- | --- |
 | `proEnabled` | boolean | The backend's `PRO_ENABLED`. `false`: every user and guest is Pro, and no Pro wording or lock should show. `true`: `User.tier` is each user's own. For display only: it grants nothing |
 
+**`SoloAllowance`** (R11). Today's solo runs, for "N of 5 solo runs left today". Any session, guests included; `default` rate limit.
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `limit` | integer ≥ 1, or `null` | `5` for Free; `null` for Pro, and for everyone while `PRO_ENABLED` is off |
+| `used` | integer ≥ 0 | Solo runs whose side was picked since the last UTC midnight, a run still in play included, for every tier. An offer with no side pick doesn't count; quitting doesn't give a run back; duels never count |
+| `resetsAt` | epoch ms | The next UTC midnight. The client never sends a time zone |
+
+**The daily cap** (R11). While `limit` is set and `used` has reached it, `POST /solo/sessions` and `POST /solo/sessions/:sessionId/side` refuse with `forbidden`, `reason: 'daily_cap'`, `retryAfterMs` to the next UTC midnight, and "You've played your 5 solo runs today. Duels are unlimited." The start refuses before anything else, so a run in play isn't ended. The side pick counts and claims in one step, so two tabs can't both take the fifth run. The client never counts on its own.
+
 **`SoloMatchOffer`.** The run is created and the player picks a side next.
 
 | Field | Type | Rule |
@@ -388,8 +399,8 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | `signIn` | `invalid_input` (bad form), `unauthorized` (wrong credentials) |
 | `signUp` | `invalid_input` (bad form, or **handle taken**) |
 | `upgradeGuest` | `invalid_input` (bad form, handle taken), `unauthorized` (no session), `forbidden` (already registered) |
-| `findMatch` | `unauthorized`, `invalid_input`, `empty_pool` + `emptyBecause` |
-| `chooseSide` | `not_found`, `forbidden` (side already chosen) |
+| `findMatch` | `unauthorized`, `invalid_input`, `empty_pool` + `emptyBecause`, `forbidden` + `reason: 'daily_cap'` + `retryAfterMs` (R11) |
+| `chooseSide` | `not_found`, `forbidden` (side already chosen), `forbidden` + `reason: 'daily_cap'` + `retryAfterMs` (R11) |
 | `guess` | `invalid_input`, `not_found`, `session_over` (run over, or round already ended), `rate_limited` + `retryAfterMs` |
 | `syncSession`, `quit` | `not_found`, `invalid_input` (no side chosen yet) |
 | `getSummary` | `not_found`, `invalid_input`, `forbidden` (run still in progress) |
@@ -397,6 +408,7 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | `getPlayerDirectory` | `unauthorized`, `rate_limited` + `retryAfterMs` |
 | `getOverview` | `rate_limited` + `retryAfterMs` |
 | `getConfig` | `rate_limited` + `retryAfterMs` |
+| `getAllowance` | `unauthorized` |
 | Any | `server_error` |
 
 ### Solo behaviour the web relies on

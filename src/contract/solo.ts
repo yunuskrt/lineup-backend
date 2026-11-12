@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  epochMsSchema,
   guessTextSchema,
   idSchema,
   livesSchema,
@@ -95,3 +96,13 @@ export const soloSummarySchema = z
   })
   .register(contractRegistry, { id: 'SoloSummary' });
 export type SoloSummary = z.infer<typeof soloSummarySchema>;
+
+// R11: limit null means unlimited
+export const soloAllowanceSchema = z
+  .object({
+    limit: z.number().int().positive().nullable(),
+    used: z.number().int().nonnegative(),
+    resetsAt: epochMsSchema,
+  })
+  .register(contractRegistry, { id: 'SoloAllowance' });
+export type SoloAllowance = z.infer<typeof soloAllowanceSchema>;

@@ -3,6 +3,7 @@ import type {
   ApiError,
   ApiErrorCode,
   EmptyPoolReason,
+  ForbiddenReason,
 } from '@/contract/envelope.js';
 
 export type ServerErrorCode = Exclude<ApiErrorCode, 'network'>;
@@ -27,6 +28,7 @@ export const SERVER_ERROR_MESSAGE = 'Something went wrong. Please try again.';
 type ApiErrorExtras = {
   retryAfterMs?: number;
   emptyBecause?: EmptyPoolReason;
+  reason?: ForbiddenReason;
 };
 
 export class ApiException extends Error {
@@ -45,6 +47,7 @@ export class ApiException extends Error {
       message,
       retryAfterMs: extras.retryAfterMs ?? null,
       ...(extras.emptyBecause && { emptyBecause: extras.emptyBecause }),
+      ...(extras.reason && { reason: extras.reason }),
     };
   }
 }

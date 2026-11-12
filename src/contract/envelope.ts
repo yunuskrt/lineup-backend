@@ -23,12 +23,19 @@ export const emptyPoolReasonSchema = z
   .register(contractRegistry, { id: 'EmptyPoolReason' });
 export type EmptyPoolReason = z.infer<typeof emptyPoolReasonSchema>;
 
+// R9: why a forbidden call was refused
+export const forbiddenReasonSchema = z
+  .enum(['pro_required', 'daily_cap'])
+  .register(contractRegistry, { id: 'ForbiddenReason' });
+export type ForbiddenReason = z.infer<typeof forbiddenReasonSchema>;
+
 export const apiErrorSchema = z
   .object({
     code: apiErrorCodeSchema,
     message: z.string().min(1),
     retryAfterMs: z.number().int().nonnegative().nullable(),
     emptyBecause: emptyPoolReasonSchema.optional(),
+    reason: forbiddenReasonSchema.optional(),
   })
   .refine(
     (error) =>
@@ -46,6 +53,11 @@ export const apiErrorSchema = z
       path: ['emptyBecause'],
     },
   )
+  // Optional with forbidden; never without it
+  .refine((error) => error.reason === undefined || error.code === 'forbidden', {
+    error: 'reason is set only with forbidden',
+    path: ['reason'],
+  })
   .register(contractRegistry, { id: 'ApiError' });
 export type ApiError = z.infer<typeof apiErrorSchema>;
 

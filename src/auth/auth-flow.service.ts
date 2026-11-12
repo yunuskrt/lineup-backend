@@ -3,6 +3,7 @@ import { AuthService } from '@thallesp/nestjs-better-auth';
 import { isAPIError } from 'better-auth/api';
 import { ApiException, SERVER_ERROR_MESSAGE } from '@/common/api-exception.js';
 import type { Auth } from '@/auth/auth.factory.js';
+import { effectiveTier, storedTier } from '@/auth/tier.js';
 import { ENV } from '@/config/config.module.js';
 import type { Env } from '@/config/env.schema.js';
 import type {
@@ -53,9 +54,10 @@ type AuthUser = {
   handle: string;
   isAnonymous?: boolean | null;
   emailVerified?: boolean | null;
+  tier?: unknown;
 };
 
-export function toContractUser(user: AuthUser): User {
+export function toContractUser(user: AuthUser, proEnabled: boolean): User {
   // All resolved here, never read from a request
   const isGuest = user.isAnonymous === true;
   return {
@@ -63,7 +65,7 @@ export function toContractUser(user: AuthUser): User {
     handle: user.handle,
     isGuest,
     emailVerified: !isGuest && user.emailVerified === true,
-    tier: 'free',
+    tier: effectiveTier(storedTier(user.tier), proEnabled),
   };
 }
 
@@ -79,6 +81,7 @@ export function asAuthUser(
     handle: user.handle,
     isAnonymous: user.isAnonymous === true,
     emailVerified: user.emailVerified === true,
+    tier: user.tier,
   };
 }
 
@@ -124,7 +127,7 @@ export class AuthFlowService {
       });
       const found = result.response;
       return {
-        data: found ? { user: toContractUser(found.user) } : null,
+        data: found ? { user: this.toUser(found.user) } : null,
         ...issued(result.headers),
       };
     } catch (error) {
@@ -353,12 +356,16 @@ export class AuthFlowService {
     }
   }
 
+  private toUser(user: AuthUser): User {
+    return toContractUser(user, this.env.PRO_ENABLED);
+  }
+
   private withCookies(result: {
     headers: Headers;
     response: { user: AuthUser };
   }): WithCookies<Session> {
     return {
-      data: { user: toContractUser(result.response.user) },
+      data: { user: this.toUser(result.response.user) },
       ...issued(result.headers),
     };
   }

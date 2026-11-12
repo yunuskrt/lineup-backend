@@ -31,12 +31,15 @@ const SIGN_UP = {
   handle: 'fan_05',
 };
 const USER = { id: 'u-1', handle: 'fan_05', email: 'fan@lineup.gg' };
-const ENV_STUB = { WEB_APP_URL: 'http://localhost:3000' } as Env;
+const ENV_STUB = {
+  WEB_APP_URL: 'http://localhost:3000',
+  PRO_ENABLED: true,
+} as Env;
 const CALLBACK = 'http://localhost:3000/profile';
 
 describe('toContractUser', () => {
   it('keeps only the contract fields, resolved by the server', () => {
-    expect(toContractUser(USER)).toEqual({
+    expect(toContractUser(USER, true)).toEqual({
       id: 'u-1',
       handle: 'fan_05',
       isGuest: false,
@@ -46,22 +49,41 @@ describe('toContractUser', () => {
   });
 
   it('reads emailVerified from the stored flag', () => {
-    expect(toContractUser({ ...USER, emailVerified: true }).emailVerified).toBe(
-      true,
-    );
-    expect(toContractUser({ ...USER, emailVerified: null }).emailVerified).toBe(
-      false,
-    );
+    expect(
+      toContractUser({ ...USER, emailVerified: true }, true).emailVerified,
+    ).toBe(true);
+    expect(
+      toContractUser({ ...USER, emailVerified: null }, true).emailVerified,
+    ).toBe(false);
   });
 
   it('never marks a guest as verified', () => {
     const guest = { ...USER, isAnonymous: true, emailVerified: true };
-    expect(toContractUser(guest).emailVerified).toBe(false);
+    expect(toContractUser(guest, true).emailVerified).toBe(false);
+  });
+
+  it('sends the stored tier while the switch is on', () => {
+    expect(toContractUser({ ...USER, tier: 'pro' }, true).tier).toBe('pro');
+    expect(toContractUser({ ...USER, tier: 'free' }, true).tier).toBe('free');
+  });
+
+  it('makes everyone Pro while the switch is off', () => {
+    expect(toContractUser({ ...USER, tier: 'free' }, false).tier).toBe('pro');
+    expect(toContractUser(USER, false).tier).toBe('pro');
+  });
+
+  it('reads a missing or unknown stored tier as free', () => {
+    expect(toContractUser(USER, true).tier).toBe('free');
+    expect(toContractUser({ ...USER, tier: 'gold' }, true).tier).toBe('free');
   });
 
   it('reads isGuest from the stored anonymous flag only', () => {
-    expect(toContractUser({ ...USER, isAnonymous: true }).isGuest).toBe(true);
-    expect(toContractUser({ ...USER, isAnonymous: null }).isGuest).toBe(false);
+    expect(toContractUser({ ...USER, isAnonymous: true }, true).isGuest).toBe(
+      true,
+    );
+    expect(toContractUser({ ...USER, isAnonymous: null }, true).isGuest).toBe(
+      false,
+    );
   });
 });
 
@@ -200,7 +222,7 @@ describe('AuthFlowService', () => {
       returnHeaders: true,
     });
     expect(result).toEqual({
-      data: { user: toContractUser(USER) },
+      data: { user: toContractUser(USER, true) },
       cookies: ['lineup.session_token=new; HttpOnly'],
       authToken: null,
     });
@@ -249,7 +271,7 @@ describe('AuthFlowService', () => {
       returnHeaders: true,
     });
     expect(result).toEqual({
-      data: { user: toContractUser(USER) },
+      data: { user: toContractUser(USER, true) },
       cookies: ['lineup.session_token=new; HttpOnly'],
       authToken: null,
     });
@@ -302,7 +324,7 @@ describe('AuthFlowService', () => {
       response: { session: {}, user: USER },
     });
     expect(await service.getSession(headers)).toEqual({
-      data: { user: toContractUser(USER) },
+      data: { user: toContractUser(USER, true) },
       cookies: ['lineup.session_token=renewed'],
       authToken: null,
     });
@@ -408,7 +430,7 @@ describe('AuthFlowService guests', () => {
       api.signInAnonymous.mockResolvedValue(anonymous());
 
       expect(await service.continueAsGuest(headers)).toEqual({
-        data: { user: toContractUser(GUEST) },
+        data: { user: toContractUser(GUEST, true) },
         cookies: ['lineup.session_token=g'],
         authToken: null,
       });
@@ -423,7 +445,7 @@ describe('AuthFlowService guests', () => {
 
       const result = await service.continueAsGuest(headers);
 
-      expect(result.data.user).toEqual(toContractUser(GUEST));
+      expect(result.data.user).toEqual(toContractUser(GUEST, true));
       expect(api.signInAnonymous).not.toHaveBeenCalled();
     });
 
@@ -482,7 +504,7 @@ describe('AuthFlowService guests', () => {
       const result = await service.upgradeGuest(UPGRADE, headers);
 
       expect(result).toEqual({
-        data: { user: { ...toContractUser(NEW_USER), id: 'g-1' } },
+        data: { user: { ...toContractUser(NEW_USER, true), id: 'g-1' } },
         cookies: ['lineup.session_token=new'],
         authToken: null,
       });

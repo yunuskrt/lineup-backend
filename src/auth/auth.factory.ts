@@ -69,6 +69,13 @@ export function createAuth(prisma: PrismaService, env: Env, mailer: Mailer) {
           required: true,
           validator: { input: handleSchema },
         },
+        // Read with the session; no route may set it
+        tier: {
+          type: ['free', 'pro'],
+          required: false,
+          input: false,
+          defaultValue: 'free',
+        },
       },
     },
     // A guest's cookie is its only identity

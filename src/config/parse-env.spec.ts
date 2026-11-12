@@ -29,6 +29,7 @@ describe('parseEnv', () => {
         MATCH_POOL_INCLUDE_UNSCORED: false,
         TRUST_PROXY_HOPS: 0,
         RATE_LIMITS_ENABLED: true,
+        PRO_ENABLED: false,
         ...base,
       },
     });
@@ -45,6 +46,7 @@ describe('parseEnv', () => {
         MATCH_POOL_INCLUDE_UNSCORED: false,
         TRUST_PROXY_HOPS: 0,
         RATE_LIMITS_ENABLED: true,
+        PRO_ENABLED: false,
       },
     });
   });
@@ -357,6 +359,23 @@ describe('parseEnv', () => {
       const result = parseEnv({ ...prod, RATE_LIMITS_ENABLED: 'false' });
       expect(!result.success && result.error).toEqual([
         { key: 'RATE_LIMITS_ENABLED', reason: 'Must be true in production' },
+      ]);
+    });
+  });
+
+  describe('PRO_ENABLED', () => {
+    it.each([
+      ['true', true],
+      ['false', false],
+    ])('parses %j', (raw, expected) => {
+      const result = parseEnv({ ...base, PRO_ENABLED: raw });
+      expect(result.success && result.data.PRO_ENABLED).toBe(expected);
+    });
+
+    it('rejects a value that is not a boolean', () => {
+      const result = parseEnv({ ...base, PRO_ENABLED: 'pro' });
+      expect(!result.success && result.error.map((i) => i.key)).toEqual([
+        'PRO_ENABLED',
       ]);
     });
   });

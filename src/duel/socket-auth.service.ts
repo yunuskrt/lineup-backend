@@ -1,7 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { NO_SESSION, toContractUser } from '@/auth/auth-flow.service.js';
 import { GatewayTokenService } from '@/auth/gateway-token.service.js';
 import { ApiException } from '@/common/api-exception.js';
+import { ENV } from '@/config/config.module.js';
+import type { Env } from '@/config/env.schema.js';
 import type { User } from '@/contract/auth.js';
 import { isSupportedProtocol, PROTOCOL_VERSION } from '@/contract/protocol.js';
 import { socketHandshakeSchema } from '@/contract/socket.js';
@@ -23,6 +25,7 @@ export class SocketAuthService {
   constructor(
     private readonly tokens: GatewayTokenService,
     private readonly prisma: PrismaService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   async authenticate(auth: unknown): Promise<User> {
@@ -49,9 +52,10 @@ export class SocketAuthService {
         handle: true,
         isAnonymous: true,
         emailVerified: true,
+        tier: true,
       },
     });
     if (!user) throw new ApiException('unauthorized', NO_SESSION);
-    return toContractUser(user);
+    return toContractUser(user, this.env.PRO_ENABLED);
   }
 }

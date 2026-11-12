@@ -6,3 +6,5 @@ if (existsSync('.env')) process.loadEnvFile('.env');
 delete process.env.RESEND_API_KEY;
 // Suites share one IP; the rate-limit suite opts in
 process.env.RATE_LIMITS_ENABLED = 'false';
+// As dev: the real split; tier suites override it
+process.env.PRO_ENABLED = 'true';

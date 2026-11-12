@@ -11,6 +11,7 @@ import { ContractResponseInterceptor } from '@/common/contract-response.js';
 import { EnvelopeExceptionFilter } from '@/common/envelope-exception.filter.js';
 import { OriginCheckMiddleware } from '@/common/origin-check.middleware.js';
 import { THROTTLER_OPTIONS } from '@/common/rate-limits.js';
+import { AppConfigModule } from '@/config/app-config.module.js';
 import { ConfigModule } from '@/config/config.module.js';
 import { DuelModule } from '@/duel/duel.module.js';
 import { MatchesModule } from '@/matches/matches.module.js';
@@ -23,6 +24,7 @@ import { UsersModule } from '@/users/users.module.js';
     // In memory until B46 swaps in Redis
     ThrottlerModule.forRoot(THROTTLER_OPTIONS),
     ConfigModule,
+    AppConfigModule,
     PrismaModule,
     AuthModule,
     UsersModule,

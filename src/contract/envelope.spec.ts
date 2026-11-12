@@ -28,6 +28,22 @@ describe('apiErrorSchema', () => {
     );
   });
 
+  it('takes an optional reason with forbidden, and only then', () => {
+    const refused = error({ code: 'forbidden', message: 'That needs Pro.' });
+    for (const reason of ['pro_required', 'daily_cap']) {
+      expect(apiErrorSchema.safeParse({ ...refused, reason }).success).toBe(
+        true,
+      );
+    }
+    expect(apiErrorSchema.safeParse(refused).success).toBe(true);
+    expect(
+      apiErrorSchema.safeParse({ ...refused, reason: 'banned' }).success,
+    ).toBe(false);
+    expect(
+      apiErrorSchema.safeParse(error({ reason: 'pro_required' })).success,
+    ).toBe(false);
+  });
+
   it('requires emptyBecause with empty_pool, and only then', () => {
     const empty = error({ code: 'empty_pool', emptyBecause: 'era' });
     expect(apiErrorSchema.safeParse(empty).success).toBe(true);

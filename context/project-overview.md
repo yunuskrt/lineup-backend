@@ -217,6 +217,8 @@ The naive approach — ingest 26 seasons × 24 clubs × ~50 matches — is rough
 /play/solo            Filters → match → guessing loop → summary
 /play/duel            Lobby → matchmaking or a private room → live duel → result
 /profile              History, stats, guest → account upgrade
+/archive              Browse and search the pool, pick a match (Pro)
+/pro                  Free vs Pro, shown only while the split is on
 /leaderboard          Post-MVP
 ```
 
@@ -295,14 +297,14 @@ Pro sells **depth and convenience in solo play**. It never sells advantage in du
 | Feature                                              | Free              | Pro                           |
 | ---------------------------------------------------- | ----------------- | ----------------------------- |
 | 1v1 duels                                            | Unlimited         | Unlimited                     |
-| Solo runs                                            | Daily cap         | Unlimited                     |
+| Solo runs                                            | 5 a day (UTC)     | Unlimited                     |
 | **Exact match selection** (pick the precise fixture) | ✗                 | ✓                             |
 | Archive browse & search                              | ✗                 | ✓                             |
-| Practice mode (no lives, no timer)                   | ✗                 | ✓                             |
+| Practice mode (no lives, no timer, not saved)        | ✗                 | ✓                             |
 | Post-game review                                     | Missed count only | Full XI + every player missed |
 | Private lobbies                                      | Join only         | Host + join                   |
 
-Private rooms are open to everyone at launch; hosting as a Pro feature is a later decision.
+**One backend switch decides whether the split exists.** `PRO_ENABLED=false` makes every user and guest Pro; `true` applies the table above. The backend resolves the tier either way (Hard Constraint 16), and the clients only read it. At launch the switch is off.
 
 **Free duels are never capped.** Free users are the matchmaking pool — throttling them starves paying players of opponents. Cap solo instead.
 

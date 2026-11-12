@@ -27,6 +27,7 @@ const env: Env = {
   MATCH_POOL_INCLUDE_UNSCORED: false,
   TRUST_PROXY_HOPS: 0,
   RATE_LIMITS_ENABLED: true,
+  PRO_ENABLED: true,
 };
 
 describe('createAuth', () => {

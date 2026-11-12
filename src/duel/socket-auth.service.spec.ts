@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { NO_SESSION } from '@/auth/auth-flow.service.js';
 import type { GatewayTokenService } from '@/auth/gateway-token.service.js';
 import { ApiException } from '@/common/api-exception.js';
+import type { Env } from '@/config/env.schema.js';
 import { PROTOCOL_VERSION } from '@/contract/protocol.js';
 import { OUT_OF_DATE, SocketAuthService } from '@/duel/socket-auth.service.js';
 import type { PrismaService } from '@/prisma/prisma.service.js';
@@ -12,6 +13,7 @@ const ROW = {
   handle: 'guest-4821',
   isAnonymous: true,
   emailVerified: false,
+  tier: 'free',
 };
 
 describe('SocketAuthService', () => {
@@ -20,6 +22,7 @@ describe('SocketAuthService', () => {
   const service = new SocketAuthService(
     { verify } as unknown as GatewayTokenService,
     { user: { findUnique } } as unknown as PrismaService,
+    { PRO_ENABLED: true } as Env,
   );
   const handshake = (extra: object = {}) => ({
     token: TOKEN,
@@ -60,6 +63,25 @@ describe('SocketAuthService', () => {
       handshake({ tier: 'pro', userId: 'u-2', isGuest: false }),
     );
     expect(user).toMatchObject({ id: 'u-1', tier: 'free', isGuest: true });
+  });
+
+  it('sends the stored tier from the fresh row', async () => {
+    findUnique.mockResolvedValue({ ...ROW, tier: 'pro' });
+    expect((await service.authenticate(handshake())).tier).toBe('pro');
+    expect(findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ tier: true }),
+      }),
+    );
+  });
+
+  it('makes everyone Pro while the switch is off', async () => {
+    const off = new SocketAuthService(
+      { verify } as unknown as GatewayTokenService,
+      { user: { findUnique } } as unknown as PrismaService,
+      { PRO_ENABLED: false } as Env,
+    );
+    expect((await off.authenticate(handshake())).tier).toBe('pro');
   });
 
   it.each([

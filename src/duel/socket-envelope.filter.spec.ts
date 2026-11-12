@@ -50,6 +50,18 @@ describe('socketError', () => {
     expect(logError).not.toHaveBeenCalled();
   });
 
+  it('keeps a forbidden reason for the ack (R9)', () => {
+    const error = new ApiException('forbidden', 'That needs Pro.', {
+      reason: 'pro_required',
+    });
+    expect(socketError(error, logger)).toEqual({
+      code: 'forbidden',
+      message: 'That needs Pro.',
+      retryAfterMs: null,
+      reason: 'pro_required',
+    });
+  });
+
   it('turns a malformed ApiException into server_error', () => {
     // rate_limited needs a retryAfterMs
     const error = new ApiException('rate_limited', 'Slow down.');

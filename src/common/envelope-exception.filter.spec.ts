@@ -57,8 +57,34 @@ describe('EnvelopeExceptionFilter', () => {
     });
   });
 
+  it('sends a forbidden reason (R9)', () => {
+    const exception = new ApiException('forbidden', 'That needs Pro.', {
+      reason: 'pro_required',
+    });
+    expect(respond(exception)).toEqual({
+      status: 403,
+      body: {
+        success: false,
+        error: {
+          code: 'forbidden',
+          message: 'That needs Pro.',
+          retryAfterMs: null,
+          reason: 'pro_required',
+        },
+      },
+    });
+  });
+
   it('downgrades an ApiException that breaks the ApiError rules', () => {
     const { status, body } = respond(new ApiException('empty_pool', 'Empty.'));
+    expect(status).toBe(500);
+    expect(body.error.code).toBe('server_error');
+  });
+
+  it('downgrades a reason on a code other than forbidden', () => {
+    const { status, body } = respond(
+      new ApiException('not_found', 'Gone.', { reason: 'daily_cap' }),
+    );
     expect(status).toBe(500);
     expect(body.error.code).toBe('server_error');
   });

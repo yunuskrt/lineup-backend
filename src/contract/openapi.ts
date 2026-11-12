@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import '@/contract/auth.js';
 import '@/contract/catalog.js';
+import '@/contract/config.js';
 import '@/contract/duel.js';
 import '@/contract/profile.js';
 import { socketCatalog } from '@/contract/socket.js';

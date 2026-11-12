@@ -414,6 +414,13 @@ model UserStats {
 }
 
 // Better Auth models; field names are its own
+enum Tier {
+  free
+  pro
+
+  @@map("tier")
+}
+
 model User {
   id            String   @id @default(uuid(7)) @db.Uuid
   // Display name; Better Auth requires it
@@ -425,6 +432,8 @@ model User {
   handle        String
   // A guest: Better Auth's anonymous plugin
   isAnonymous   Boolean  @default(false) @map("is_anonymous")
+  // Stored; PRO_ENABLED decides the effective one
+  tier          Tier     @default(free)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

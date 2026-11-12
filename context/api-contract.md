@@ -37,6 +37,7 @@ A plain-text transcription of what `lineup-web` sends and expects today, taken f
 | `message` | string | Non-empty, safe to show the player. No stack traces, SQL or provider text. |
 | `retryAfterMs` | integer ≥ 0, or `null` | Set with `rate_limited`; `null` otherwise. |
 | `emptyBecause` | `EmptyPoolReason`, optional | Present **only** with `empty_pool`. |
+| `reason` | `ForbiddenReason`, optional | Only ever with `forbidden` (R9), and optional there: most refusals have none. |
 
 ### Error codes (`ApiErrorCode`)
 
@@ -52,6 +53,10 @@ A plain-text transcription of what `lineup-web` sends and expects today, taken f
 | `network` | **Client-only.** The web app sets it when the request fails; the server never sends it. |
 | `server_error` | Anything unexpected |
 | `protocol_refused` | Client build older than the server accepts (socket handshake) |
+
+### `ForbiddenReason` (R9)
+
+`pro_required` · `daily_cap`. `pro_required`: the feature needs Pro (R10, R12–R14). `daily_cap`: the free solo runs for the UTC day are used up (R11). The same field on REST and in socket acks. The message stays safe to show (for example "That needs Pro.").
 
 ### `EmptyPoolReason`
 
@@ -181,7 +186,7 @@ The client draws its countdown from these. It **never decides** an expiry; at 0 
 | `id` | id | |
 | `handle` | string | Non-empty |
 | `isGuest` | boolean | |
-| `tier` | `Tier` | **Resolved by the server.** The client never asserts it. |
+| `tier` | `Tier` | **Resolved by the server** (R9), never asserted by the client. The effective tier: the user's stored tier while `PRO_ENABLED` is on, `pro` for everyone while it's off. Read from the user row on every request, so a change applies without signing in again. |
 
 `Session` = `{ user: User }`.
 
@@ -210,6 +215,7 @@ Paths are suggestions. Every response body is the envelope from §2, wrapping th
 | 15 | `profile.getHistory` | `GET /profile/history?cursor=&limit=` | `HistoryQuery` | `HistoryPage` |
 | 16 | `catalog.getPlayerDirectory` | `GET /catalog/players` | — | `PlayerDirectory` (R5), or `304` with no body |
 | 17 | `catalog.getOverview` | `GET /catalog/overview` | — | `CatalogOverview` (R7). Public: no session needed |
+| 18 | `config.getConfig` | `GET /config` | — | `AppConfig` (R9). Public: no session needed |
 
 Better Auth (B10) mounts its own routes. Calls 1–6 may map onto them rather than onto these paths; the web only needs the shapes.
 
@@ -304,6 +310,12 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 
 `showcase` is `null` if its match isn't loaded, the side has no formation or not 11 starters, a slot breaks the formation, a starter has no alias, a reveal isn't in that XI, or the miss isn't in the other one. The response is otherwise unchanged.
 
+**`AppConfig`** (R9). Whether the Free/Pro split exists. **Public** (no session), rate-limited with the `catalog` limit (60 a minute), `Cache-Control: public, max-age=300`: the value only changes on a restart.
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `proEnabled` | boolean | The backend's `PRO_ENABLED`. `false`: every user and guest is Pro, and no Pro wording or lock should show. `true`: `User.tier` is each user's own. For display only: it grants nothing |
+
 **`SoloMatchOffer`.** The run is created and the player picks a side next.
 
 | Field | Type | Rule |
@@ -384,6 +396,7 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | `getProfile`, `getHistory` | `unauthorized`; `getHistory` also `invalid_input` |
 | `getPlayerDirectory` | `unauthorized`, `rate_limited` + `retryAfterMs` |
 | `getOverview` | `rate_limited` + `retryAfterMs` |
+| `getConfig` | `rate_limited` + `retryAfterMs` |
 | Any | `server_error` |
 
 ### Solo behaviour the web relies on

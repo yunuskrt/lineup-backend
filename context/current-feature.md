@@ -64,3 +64,4 @@ Not Started
 - R6b Room History: is_private on game_sessions, HistoryEntry.isPrivate
 - R7 Catalog Overview: GET /catalog/overview, showcase off pool, 5m cache
 - R8 Showcase Reveals: +Ramos, Navas, Marcelo; reveals 8,10,9,7,5,2,0,4
+- R9 Pro Tier & Switch: users.tier, PRO_ENABLED, GET /config, reason

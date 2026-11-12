@@ -17,6 +17,7 @@ import type {
   SoloStartRequest,
   SoloSummary,
 } from '@/contract/solo.js';
+import { startRound } from '@/game/clock.js';
 import {
   applyTimed,
   createTimedGame,
@@ -54,6 +55,7 @@ export const SOLO_MESSAGES = {
   stillPlaying: 'The run is still in progress.',
   notAllowed: 'That is not allowed in a solo run.',
   proToPick: 'Picking a match needs Pro.',
+  proToPractise: 'Practice needs Pro.',
   notInGame: "That match isn't in the game.",
   dailyCap: `You've played your ${SOLO_DAILY_RUNS} solo runs today. Duels are unlimited.`,
 } as const;
@@ -86,16 +88,17 @@ export class SoloService {
 
   async start(
     user: User,
-    { matchId, ...filters }: SoloStartRequest,
+    { matchId, practice = false, ...filters }: SoloStartRequest,
   ): Promise<SoloMatchOffer> {
-    // R13: before the cap, whatever Free's count
-    if (matchId !== undefined && user.tier !== 'pro') {
-      throw new ApiException('forbidden', SOLO_MESSAGES.proToPick, {
-        reason: 'pro_required',
-      });
+    // R13, R14: before the cap, whatever Free's count
+    if ((practice || matchId !== undefined) && user.tier !== 'pro') {
+      const message = practice
+        ? SOLO_MESSAGES.proToPractise
+        : SOLO_MESSAGES.proToPick;
+      throw new ApiException('forbidden', message, { reason: 'pro_required' });
     }
     // First: a refusal ends no run and picks no match
-    if (user.tier === 'free') {
+    if (user.tier === 'free' && !practice) {
       const at = this.clock.now();
       this.assertUnderCap(user, await this.savedToday(user.id, at), at);
     }
@@ -112,6 +115,7 @@ export class SoloService {
       userId: user.id,
       match,
       touchedAt: now,
+      practice,
       side: null,
       squad: null,
       timed: null,
@@ -134,19 +138,23 @@ export class SoloService {
   ): Promise<SoloSession> {
     const offer = this.offerOf(sessionId, user);
     const squad = await this.squads.load(offer.match.id, side);
+    // Practice never counts toward the cap
+    const isCounted = user.tier === 'free' && !offer.practice;
     // Last await: then count and claim as one step
-    const saved =
-      user.tier === 'free'
-        ? await this.savedToday(user.id, this.clock.now())
-        : [];
+    const saved = isCounted
+      ? await this.savedToday(user.id, this.clock.now())
+      : [];
     // A concurrent call may have taken it meanwhile
     this.offerOf(sessionId, user);
 
     const now = this.clock.now();
-    this.assertUnderCap(user, saved, now);
-    const timed = createTimedGame({ mode: 'solo', squad: squad.entries }, now);
-    // A new game always has round 1 running
-    const firstRound = timed.round!;
+    if (isCounted) this.assertUnderCap(user, saved, now);
+    const timed = createTimedGame(
+      { mode: 'solo', squad: squad.entries, practice: offer.practice },
+      now,
+    );
+    // Practice has no clock: an anchor for the figures
+    const firstRound = timed.round ?? startRound(now);
     const run: PlayedRun = {
       ...offer,
       touchedAt: now,
@@ -220,7 +228,8 @@ export class SoloService {
       for (const { id, userId } of this.store.played()) {
         // Re-read: a request may have moved it on
         const run = this.store.get(id, userId);
-        if (!run?.side) continue;
+        // Practice has no clock to tick and no save
+        if (!run?.side || run.practice) continue;
         const tick = applyTimed(run.timed, { kind: 'tick' }, now);
         // The clock moving is not the player's touch
         await this.settle(this.record(run, tick, run.touchedAt), now);
@@ -271,6 +280,7 @@ export class SoloService {
     const since = utcDayStart(now);
     const ids = new Set(saved);
     for (const run of this.store.played()) {
+      if (run.practice) continue;
       if (run.userId === userId && run.firstRound.startedAt >= since) {
         ids.add(run.id);
       }
@@ -301,7 +311,8 @@ export class SoloService {
   private async endOpenRun(userId: string, now: number): Promise<void> {
     const open = this.store.activeOf(userId);
     if (!open) return;
-    if (open.side === null) {
+    // An offer or a practice run is never saved
+    if (open.side === null || open.practice) {
       this.store.drop(open.id);
       return;
     }
@@ -338,7 +349,10 @@ export class SoloService {
     const now = this.clock.now();
     const played = this.playedOf(sessionId, user);
     const step = applyTimed(played.timed, input, now);
-    const run = this.record(played, step, now);
+    // R14: a sync or refused input isn't play
+    const isRead =
+      played.practice && (input.kind === 'tick' || step.rejected !== null);
+    const run = this.record(played, step, isRead ? played.touchedAt : now);
     await this.settle(run, now);
     return { run, step };
   }

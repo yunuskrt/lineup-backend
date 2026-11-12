@@ -5,6 +5,7 @@ import {
   IDENTITY,
   NAMES,
   playedRun,
+  practiceRun,
   SQUAD,
 } from '@/solo/solo.fixtures.js';
 import { toSoloSession, toSoloSummary } from '@/solo/solo-views.js';
@@ -88,6 +89,7 @@ describe('toSoloSummary', () => {
       accuracy: 1,
       bestStreak: 2,
       roundTimesMs: [3_000, 2_000, 1_000],
+      practice: false,
     });
     expectNoneOf(summary, hiddenOf(['alfa', 'kilo']));
   });
@@ -140,5 +142,43 @@ describe('toSoloSummary', () => {
     expect(() => toSoloSummary(playedRun(), 'pro')).toThrow(
       'The run is not over',
     );
+  });
+});
+
+describe('practice views (R14)', () => {
+  const MINUTE = 60_000;
+
+  it('shows a practice run with no round and 3 lives', () => {
+    const session = toSoloSession(practiceRun([guess('alfa'), 20 * MINUTE]));
+
+    expect(soloSessionSchema.parse(session)).toEqual(session);
+    expect(session).toMatchObject({
+      status: 'active',
+      lives: 3,
+      round: null,
+      practice: true,
+    });
+  });
+
+  it('sums up with real times between finds', () => {
+    const run = practiceRun(
+      [guess('alfa'), 2 * MINUTE],
+      [guess('kilo'), 5 * MINUTE],
+      [QUIT, 6 * MINUTE],
+    );
+    const summary = toSoloSummary(run, 'pro');
+
+    expect(soloSummarySchema.parse(summary)).toEqual(summary);
+    expect(summary).toMatchObject({
+      livesRemaining: 3,
+      endReason: 'quit',
+      practice: true,
+      roundTimesMs: [2 * MINUTE, 3 * MINUTE, MINUTE],
+      missed: SQUAD.players.slice(1, 10),
+    });
+    expect(summary.found.map((player) => player.elapsedMs)).toEqual([
+      2 * MINUTE,
+      3 * MINUTE,
+    ]);
   });
 });

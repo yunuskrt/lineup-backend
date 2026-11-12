@@ -552,6 +552,197 @@ describe('SoloService', () => {
     });
   });
 
+  describe('practice (R14)', () => {
+    const PRACTICE = { ...FILTERS, practice: true };
+    const pro = user('user-1', 'pro');
+    const DAY = 86_400_000;
+
+    async function practising(ctx = setup(), who = pro, body = PRACTICE) {
+      const { sessionId } = await ctx.service.start(who, body);
+      const session = await ctx.service.chooseSide(who, sessionId, 'home');
+      return { ...ctx, sessionId, who, session };
+    }
+
+    it('starts with no round, 3 lives and the flag', async () => {
+      const { session } = await practising();
+      expect(session).toMatchObject({
+        status: 'active',
+        lives: 3,
+        round: null,
+        practice: true,
+      });
+    });
+
+    it('never expires, and ends on all 11 with 3 lives', async () => {
+      const ctx = await practising();
+      ctx.clock.at = T0 + DAY;
+      expect(await ctx.service.sync(pro, ctx.sessionId)).toMatchObject({
+        status: 'active',
+        lives: 3,
+        round: null,
+      });
+      for (const name of NAMES) {
+        await ctx.service.guess(
+          pro,
+          ctx.sessionId,
+          guessOf(ctx.sessionId, name),
+        );
+      }
+      expect(await ctx.service.summary(pro, ctx.sessionId)).toMatchObject({
+        endReason: 'perfect_clear',
+        livesRemaining: 3,
+        practice: true,
+      });
+    });
+
+    it('validates guesses as usual', async () => {
+      const ctx = await practising();
+      const miss = await ctx.service.guess(
+        pro,
+        ctx.sessionId,
+        guessOf(ctx.sessionId, 'nobody'),
+      );
+      expect(miss.result).toEqual({ outcome: 'not_in_xi' });
+      expect(miss.session.round).toBeNull();
+    });
+
+    it('refuses Free with pro_required, before the cap', async () => {
+      const ctx = setup();
+      const { sessionId } = await playing(ctx);
+      ctx.findMany.mockClear();
+      ctx.select.mockClear();
+
+      expect(
+        await failureOf(() => ctx.service.start(user(), PRACTICE)),
+      ).toEqual({
+        code: 'forbidden',
+        message: SOLO_MESSAGES.proToPractise,
+        retryAfterMs: null,
+        reason: 'pro_required',
+      });
+      expect(
+        await failureOf(() =>
+          ctx.service.start(user(), { ...PRACTICE, matchId: 'm-1' }),
+        ),
+      ).toMatchObject({ message: SOLO_MESSAGES.proToPractise });
+      expect(ctx.findMany).not.toHaveBeenCalled();
+      expect(ctx.select).not.toHaveBeenCalled();
+      expect(ctx.store.activeOf('user-1')?.id).toBe(sessionId);
+    });
+
+    it('plays a picked match with matchId', async () => {
+      const ctx = setup();
+      const offer = await ctx.service.start(pro, {
+        ...PRACTICE,
+        clubIds: ['nobody'],
+        matchId: 'm-1',
+      });
+      expect(offer.match.id).toBe('m-1');
+      expect(ctx.isPlayable).toHaveBeenCalledWith('m-1');
+      expect(ctx.select).not.toHaveBeenCalled();
+    });
+
+    it('is never saved, at its end or in the sweep', async () => {
+      const ctx = await practising();
+      await ctx.service.guess(
+        pro,
+        ctx.sessionId,
+        guessOf(ctx.sessionId, 'alfa'),
+      );
+      await ctx.service.quit(pro, ctx.sessionId);
+      ctx.clock.at = T0 + 60_000;
+      await ctx.service.sweep();
+
+      expect(ctx.save).not.toHaveBeenCalled();
+      expect(await ctx.service.summary(pro, ctx.sessionId)).toMatchObject({
+        endReason: 'quit',
+        practice: true,
+      });
+    });
+
+    it('never counts toward the allowance or checks the cap', async () => {
+      const ctx = setup();
+      const before = await ctx.service.allowance(pro);
+      ctx.findMany.mockClear();
+      await practising(ctx);
+
+      expect(ctx.findMany).not.toHaveBeenCalled();
+      expect((await ctx.service.allowance(pro)).used).toBe(before.used);
+      await playing(ctx, pro);
+      expect((await ctx.service.allowance(pro)).used).toBe(before.used + 1);
+    });
+
+    it('ends a real run in play, which is saved', async () => {
+      const ctx = setup();
+      const real = await playing(ctx, pro);
+      await ctx.service.start(pro, PRACTICE);
+
+      expect(ctx.save).toHaveBeenCalledTimes(1);
+      expect((ctx.save.mock.calls[0][0] as PlayedRun).id).toBe(real.sessionId);
+    });
+
+    it('is dropped, unsaved, by the next start', async () => {
+      const ctx = await practising();
+      await ctx.service.start(pro, FILTERS);
+
+      expect(ctx.save).not.toHaveBeenCalled();
+      expect(ctx.store.get(ctx.sessionId, 'user-1')).toBeUndefined();
+    });
+
+    describe('the idle drop', () => {
+      const dropped = { code: 'not_found', message: SOLO_MESSAGES.notFound };
+
+      it('drops a run 30 minutes after its last guess', async () => {
+        const ctx = await practising();
+        ctx.clock.at = T0 + 1_000;
+        await ctx.service.guess(
+          pro,
+          ctx.sessionId,
+          guessOf(ctx.sessionId, 'alfa'),
+        );
+
+        ctx.clock.at = T0 + 1_000 + RUN_IDLE_MS - 1;
+        await ctx.service.sweep();
+        expect(ctx.store.get(ctx.sessionId, 'user-1')).toBeDefined();
+
+        ctx.clock.at = T0 + 1_000 + RUN_IDLE_MS;
+        await ctx.service.sweep();
+        expect(
+          await failureOf(() => ctx.service.sync(pro, ctx.sessionId)),
+        ).toMatchObject(dropped);
+      });
+
+      it('is not kept alive by a sync', async () => {
+        const ctx = await practising();
+        ctx.clock.at = T0 + RUN_IDLE_MS - 1;
+        await ctx.service.sync(pro, ctx.sessionId);
+
+        ctx.clock.at = T0 + RUN_IDLE_MS;
+        await ctx.service.sweep();
+        expect(
+          await failureOf(() =>
+            ctx.service.guess(pro, ctx.sessionId, guessOf(ctx.sessionId, 'a')),
+          ),
+        ).toMatchObject(dropped);
+      });
+
+      it('drops an ended run 30 minutes after its end', async () => {
+        const ctx = await practising();
+        ctx.clock.at = T0 + 5_000;
+        await ctx.service.quit(pro, ctx.sessionId);
+        // A second quit only reads the ended run
+        ctx.clock.at = T0 + 5_000 + RUN_IDLE_MS - 1;
+        await ctx.service.quit(pro, ctx.sessionId);
+
+        ctx.clock.at = T0 + 5_000 + RUN_IDLE_MS;
+        await ctx.service.sweep();
+        expect(
+          await failureOf(() => ctx.service.summary(pro, ctx.sessionId)),
+        ).toMatchObject(dropped);
+      });
+    });
+  });
+
   describe('daily cap (R11)', () => {
     // T0 is on day 0: the next UTC midnight is a day
     const MIDNIGHT = 86_400_000;

@@ -8,10 +8,15 @@ export type RunFigures = {
   roundTimesMs: number[];
 };
 
+// Practice rounds have no length to cap at
+const capOf = (isPractice: boolean) => (isPractice ? Infinity : ROUND_MS);
+
 export function runFigures(
   firstRound: RoundTiming,
   effects: readonly TimedEffect[],
+  isPractice = false,
 ): RunFigures {
+  const cap = capOf(isPractice);
   let guesses = 0;
   let correct = 0;
   let streak = 0;
@@ -34,7 +39,7 @@ export function runFigures(
         break;
       // An expired round runs into the grace window
       case 'round_ended':
-        roundTimesMs.push(Math.min(ROUND_MS, effect.endedAt - roundStart));
+        roundTimesMs.push(Math.min(cap, effect.endedAt - roundStart));
         break;
       case 'round_started':
         roundStart = effect.startedAt;
@@ -56,7 +61,9 @@ export type NamedTiming = {
 export function namedOrder(
   firstRound: RoundTiming,
   effects: readonly TimedEffect[],
+  isPractice = false,
 ): NamedTiming[] {
+  const cap = capOf(isPractice);
   let roundStart = firstRound.startedAt;
   const named: NamedTiming[] = [];
 
@@ -70,7 +77,7 @@ export function namedOrder(
         playerId: effect.verdict.playerId,
         order: named.length + 1,
         // A grace-window guess reads as the full round
-        elapsedMs: Math.min(ROUND_MS, effect.receivedAt - roundStart),
+        elapsedMs: Math.min(cap, effect.receivedAt - roundStart),
       });
     }
   }

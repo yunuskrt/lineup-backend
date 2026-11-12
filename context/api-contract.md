@@ -152,7 +152,7 @@ Every `MatchIdentity` field, **plus**:
 | Field | Type | Rule |
 | --- | --- | --- |
 | `order` | integer 1–11 | When this player was named in the session; 1 is the first. Unique, no gaps. The list is sorted by it |
-| `elapsedMs` | integer 0–15 000 | Server receipt of the correct guess minus the start of its round, capped at the round length (a guess in the grace window reads 15 000). In a duel, the finder's own turn |
+| `elapsedMs` | integer ≥ 0 | Server receipt of the correct guess minus the start of its round, capped at the round length (a guess in the grace window reads 15 000). In a duel, the finder's own turn, and never above 15 000. **In practice** (R14) there is no round: the time since the previous find (or the side pick), uncapped. `NamedPlayer` has no maximum since R14; `DuelNamedPlayer` keeps 15 000 |
 
 ### `RoundTiming`
 
@@ -228,7 +228,7 @@ Better Auth (B10) mounts its own routes. Calls 1–6 may map onto them rather th
 | `SignInRequest` | `email` (valid email), `password` (8–128 chars) |
 | `SignUpRequest` | `email`, `password` (8–128), `handle` (trimmed, 3–24 chars) |
 | `UpgradeGuestRequest` | same as `SignUpRequest` |
-| `SoloStartRequest` (R13) | Every `Filters` field, plus `matchId` (id), optional. With `matchId` the filters are ignored and that exact match is offered: Pro only (`forbidden` + `reason: 'pro_required'`, "Picking a match needs Pro.", checked before the daily cap), and it must be a match `GET /catalog/matches` can list (`not_found`, "That match isn't in the game.", for an unknown id, the showcase or any match outside the pool). Replays are allowed; the run is a normal run in history and stats. Duels never take it: `filters:submit` and `room:create` drop the key |
+| `SoloStartRequest` (R13) | Every `Filters` field, plus `matchId` (id), optional. With `matchId` the filters are ignored and that exact match is offered: Pro only (`forbidden` + `reason: 'pro_required'`, "Picking a match needs Pro.", checked before the daily cap), and it must be a match `GET /catalog/matches` can list (`not_found`, "That match isn't in the game.", for an unknown id, the showcase or any match outside the pool). Replays are allowed; the run is a normal run in history and stats. Duels never take it: `filters:submit` and `room:create` drop the key. Also `practice` (boolean), optional (R14): `true` starts a practice run (see *Practice* below). Pro only: `forbidden` + `reason: 'pro_required'`, "Practice needs Pro." (with `matchId` too, this message), checked before the daily cap. Combines with `matchId` |
 | `SoloGuessRequest` | `sessionId` (id), `guess` (trimmed, 1–64 chars) |
 | `HistoryQuery` | `cursor` (id or `null`), `limit` (integer 1–50; web default 20) |
 | `ArchiveQuery` (R12) | All optional: `q` (trimmed, 1–64 chars), `competitionId` (id), `clubId` (id, either side), `from` and `to` (season starts 2000–2025, `from ≤ to`), `cursor` (opaque, from `nextCursor`), `limit` (integer 1–50, default 20) |
@@ -338,7 +338,7 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | Field | Type | Rule |
 | --- | --- | --- |
 | `limit` | integer ≥ 1, or `null` | `5` for Free; `null` for Pro, and for everyone while `PRO_ENABLED` is off |
-| `used` | integer ≥ 0 | Solo runs whose side was picked since the last UTC midnight, a run still in play included, for every tier. An offer with no side pick doesn't count; quitting doesn't give a run back; duels never count |
+| `used` | integer ≥ 0 | Solo runs whose side was picked since the last UTC midnight, a run still in play included, for every tier. An offer with no side pick doesn't count; quitting doesn't give a run back; duels and practice runs (R14) never count |
 | `resetsAt` | epoch ms | The next UTC midnight. The client never sends a time zone |
 
 **The daily cap** (R11). While `limit` is set and `used` has reached it, `POST /solo/sessions` and `POST /solo/sessions/:sessionId/side` refuse with `forbidden`, `reason: 'daily_cap'`, `retryAfterMs` to the next UTC midnight, and "You've played your 5 solo runs today. Duels are unlimited." The start refuses before anything else, so a run in play isn't ended. The side pick counts and claims in one step, so two tabs can't both take the fifth run. The client never counts on its own.
@@ -361,7 +361,8 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | `match` | `MatchInPlay` | |
 | `lives` | 0–3 | |
 | `found` | `RevealedPlayer[]` | ≤ 11 |
-| `round` | `RoundTiming` or `null` | `null` once the run is over |
+| `round` | `RoundTiming` or `null` | `null` once the run is over, and always `null` in practice |
+| `practice` | boolean | Always sent (R14). `true` for a practice run, where `lives` stays `3` |
 
 **`SoloGuessResponse`**
 
@@ -382,7 +383,8 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | `endReason` | `SoloEndReason` | |
 | `accuracy` | 0–1 | Correct guesses ÷ all guesses |
 | `bestStreak` | integer 0–11 | |
-| `roundTimesMs` | integer ≥ 0, array | Time per round |
+| `roundTimesMs` | integer ≥ 0, array | Time per round. In practice (R14): from the side pick to the first find, then between finds, then to the quit; uncapped |
+| `practice` | boolean | Always sent (R14). In practice `livesRemaining` is `3` and `endReason` is `perfect_clear` or `quit` |
 
 **`Profile`** = `{ user: User, stats: UserStats }`
 
@@ -415,7 +417,7 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | `signIn` | `invalid_input` (bad form), `unauthorized` (wrong credentials) |
 | `signUp` | `invalid_input` (bad form, or **handle taken**) |
 | `upgradeGuest` | `invalid_input` (bad form, handle taken), `unauthorized` (no session), `forbidden` (already registered) |
-| `findMatch` | `unauthorized`, `invalid_input`, `empty_pool` + `emptyBecause`, `forbidden` + `reason: 'daily_cap'` + `retryAfterMs` (R11); with `matchId` (R13): `forbidden` + `reason: 'pro_required'`, `not_found` |
+| `findMatch` | `unauthorized`, `invalid_input`, `empty_pool` + `emptyBecause`, `forbidden` + `reason: 'daily_cap'` + `retryAfterMs` (R11); with `matchId` (R13): `forbidden` + `reason: 'pro_required'`, `not_found`; with `practice` (R14): `forbidden` + `reason: 'pro_required'` |
 | `chooseSide` | `not_found`, `forbidden` (side already chosen), `forbidden` + `reason: 'daily_cap'` + `retryAfterMs` (R11) |
 | `guess` | `invalid_input`, `not_found`, `session_over` (run over, or round already ended), `rate_limited` + `retryAfterMs` |
 | `syncSession`, `quit` | `not_found`, `invalid_input` (no side chosen yet) |
@@ -435,6 +437,15 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
   - `already_found` and `not_in_xi` leave the round running. There's no penalty and no new round.
 - **Expiry:** when the countdown reaches 0, the web calls `syncSession`. The server applies any expiry: it takes a life and starts a new round, or ends the run.
 - **Grace window:** a guess received after `endsAt` plus the grace window (400 ms) returns `session_over`.
+
+### Practice (R14)
+
+- **Start** with `practice: true` (Pro), then pick a side as usual. Everything else is the same calls.
+- **No clock and no lives lost:** `round` is always `null`, `lives` stays `3`, and `syncSession` never takes a life. Guesses are validated as usual, with the same rate limit.
+- **Ends** on all 11 (`perfect_clear`) or `quit`, never `lives_out`. `livesRemaining` is `3`; `missed` follows the tier as today.
+- **Never saved:** no history entry, no stats, and it never counts toward the daily cap (`SoloAllowance.used` is unchanged).
+- **One open run a user**, shared with real runs: starting practice ends a real run in play (saved as a quit); starting any run drops an open practice run, unsaved.
+- **Idle drop:** 30 minutes after the side pick, the last guess or the run's end, the server drops a practice run. A `syncSession` or summary read doesn't extend it. Any call on a dropped run is `not_found`, "That run no longer exists."
 
 ---
 

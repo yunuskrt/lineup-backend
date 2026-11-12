@@ -227,6 +227,43 @@ describe('namedOrder', () => {
   });
 });
 
+describe('practice figures (R14)', () => {
+  const PRACTICE: NewGame = { mode: 'solo', squad: SQUAD, practice: true };
+  const MINUTE = 60_000;
+  // Practice has no round 1: the side pick anchors it
+  const practice = (...inputs: [TimedInput, number][]) => {
+    const { effects } = streamOf(PRACTICE, ...inputs);
+    const firstRound = { startedAt: T0, endsAt: T0 + ROUND_MS };
+    return {
+      figures: runFigures(firstRound, effects, true),
+      named: namedOrder(firstRound, effects, true),
+    };
+  };
+
+  it('times between finds, uncapped, up to the quit', () => {
+    const { figures, named } = practice(
+      [guess('Alfa'), 2 * MINUTE],
+      [guess('nobody'), 3 * MINUTE],
+      [guess('Bravo'), 3 * MINUTE + 4_000],
+      [QUIT, 10 * MINUTE],
+    );
+    expect(figures.roundTimesMs).toEqual([
+      2 * MINUTE,
+      MINUTE + 4_000,
+      7 * MINUTE - 4_000,
+    ]);
+    expect(named.map((entry) => entry.elapsedMs)).toEqual([
+      2 * MINUTE,
+      MINUTE + 4_000,
+    ]);
+  });
+
+  it('still caps a timed run at the round length', () => {
+    const { firstRound, effects } = streamOf(SOLO, [guess('Alfa'), 15_300]);
+    expect(namedOrder(firstRound, effects)[0].elapsedMs).toBe(ROUND_MS);
+  });
+});
+
 describe('timedFound', () => {
   const TIMINGS = [
     { playerId: 'p-alfa', order: 1, elapsedMs: 1_000 },

@@ -8,7 +8,9 @@ type RunBase = {
   readonly id: string;
   readonly userId: string;
   readonly match: MatchIdentity;
+  // R14: practice ignores syncs and reads
   readonly touchedAt: number;
+  readonly practice: boolean;
 };
 
 // Offered: no side, so no squad and no clock
@@ -41,5 +43,7 @@ export function isOver(run: SoloRun): boolean {
 
 // Over but not yet in Postgres: never evicted
 export function isUnsaved(run: SoloRun): run is PlayedRun {
-  return run.side !== null && isOver(run) && run.savedAt === null;
+  return (
+    run.side !== null && !run.practice && isOver(run) && run.savedAt === null
+  );
 }

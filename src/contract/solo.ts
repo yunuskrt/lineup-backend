@@ -38,7 +38,11 @@ const legacyClubSchema = (side: 'home' | 'away') =>
 
 // R13: with matchId, the filters are ignored
 export const soloStartRequestSchema = filtersSchema
-  .extend({ matchId: idSchema.optional() })
+  .extend({
+    matchId: idSchema.optional(),
+    // R14: no clock, no lives lost, never saved
+    practice: z.boolean().optional(),
+  })
   .register(contractRegistry, { id: 'SoloStartRequest' });
 export type SoloStartRequest = z.infer<typeof soloStartRequestSchema>;
 
@@ -66,7 +70,9 @@ export const soloSessionSchema = z
     match: matchInPlaySchema,
     lives: livesSchema,
     found: foundPlayersSchema,
+    // Always null in practice
     round: roundTimingSchema.nullable(),
+    practice: z.boolean(),
   })
   .register(contractRegistry, { id: 'SoloSession' });
 export type SoloSession = z.infer<typeof soloSessionSchema>;
@@ -100,6 +106,7 @@ export const soloSummarySchema = z
     accuracy: ratioSchema,
     bestStreak: squadCountSchema,
     roundTimesMs: z.array(z.number().int().nonnegative()),
+    practice: z.boolean(),
   })
   .register(contractRegistry, { id: 'SoloSummary' });
 export type SoloSummary = z.infer<typeof soloSummarySchema>;

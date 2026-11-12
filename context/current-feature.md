@@ -69,3 +69,4 @@ Not Started
 - R11 Solo Daily Cap: 5 Free runs a UTC day, in-memory count, /allowance
 - R12 Match Archive: GET /catalog/matches, in-memory word search, @ProGated
 - R13 Exact Match Selection: matchId on solo start, Pro only, isPlayable
+- R14 Practice Mode: no clock or life loss, never saved, 30-min idle drop

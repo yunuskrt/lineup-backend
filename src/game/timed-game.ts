@@ -43,8 +43,10 @@ export type TimedStep = {
 
 type Applied = { timed: TimedGame; effects: TimedEffect[] };
 
+// Practice has no round clock: round stays null
 export function createTimedGame(newGame: NewGame, now: number): TimedGame {
-  return { game: createGame(newGame), round: startRound(now) };
+  const game = createGame(newGame);
+  return { game, round: game.practice ? null : startRound(now) };
 }
 
 export function nextDeadline(timed: TimedGame): number | null {
@@ -70,7 +72,8 @@ function applyAt(
   if (step.state === timed.game) return { timed, effects };
 
   // A changed state means a new round or the end
-  const round = step.state.result === null ? startRound(at) : null;
+  const isTimed = step.state.result === null && !step.state.practice;
+  const round = isTimed ? startRound(at) : null;
   return { timed: { game: step.state, round }, effects };
 }
 

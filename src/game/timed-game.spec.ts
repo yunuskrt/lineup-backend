@@ -339,3 +339,49 @@ describe('engine rejections', () => {
     expectTypeOf<{ kind: 'expire' }>().not.toExtend<TimedInput>();
   });
 });
+
+describe('practice (R14)', () => {
+  const practice = () =>
+    createTimedGame({ mode: 'solo', squad: SQUAD, practice: true }, T0);
+  const DAY = 24 * 60 * 60 * 1_000;
+
+  it('has no round clock and no deadline', () => {
+    expect(practice().round).toBeNull();
+    expect(nextDeadline(practice())).toBeNull();
+  });
+
+  it('never expires, however much time passes', () => {
+    const step = applyTimed(practice(), TICK, T0 + DAY);
+    expect(step.rejected).toBeNull();
+    expect(step.effects).toEqual([]);
+    expect(step.timed.game.lives).toEqual([3]);
+  });
+
+  it('takes a guess a day later, with the round still null', () => {
+    const step = applyTimed(practice(), guess(0, 'Alfa'), T0 + DAY);
+    expect(step.rejected).toBeNull();
+    expect(step.timed.round).toBeNull();
+    expect(step.timed.game.found).toEqual([{ playerId: 'p-alfa', foundBy: 0 }]);
+  });
+
+  it('ends on the 11th name with 3 lives and no round', () => {
+    const timed = NAMES.reduce(
+      (current, name, i) => run(current, guess(0, name), T0 + (i + 1) * DAY),
+      practice(),
+    );
+    expect(timed.round).toBeNull();
+    expect(timed.game.result).toEqual({
+      mode: 'solo',
+      endReason: 'perfect_clear',
+      livesRemaining: 3,
+    });
+  });
+
+  it('ends on quit with 3 lives', () => {
+    const timed = run(practice(), { kind: 'quit' }, T0 + DAY);
+    expect(timed.game.result).toMatchObject({
+      endReason: 'quit',
+      livesRemaining: 3,
+    });
+  });
+});

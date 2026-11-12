@@ -1,6 +1,8 @@
 import { revealedPlayer } from '@/contract/contract.fixtures.js';
 import {
   duelFoundPlayerSchema,
+  duelNamedPlayerSchema,
+  namedPlayerSchema,
   revealedPlayerSchema,
 } from '@/contract/player.js';
 
@@ -40,5 +42,24 @@ describe('revealedPlayerSchema', () => {
         foundBy: 'opponent',
       }).success,
     ).toBe(true);
+  });
+});
+
+describe('elapsedMs (R14)', () => {
+  const at = (elapsedMs: number) => ({
+    ...revealedPlayer,
+    foundBy: 'you',
+    order: 1,
+    elapsedMs,
+  });
+
+  it('is uncapped on a solo name, for practice', () => {
+    expect(namedPlayerSchema.safeParse(at(600_000)).success).toBe(true);
+    expect(namedPlayerSchema.safeParse(at(-1)).success).toBe(false);
+  });
+
+  it('stays capped at the round on a duel name', () => {
+    expect(duelNamedPlayerSchema.safeParse(at(15_000)).success).toBe(true);
+    expect(duelNamedPlayerSchema.safeParse(at(15_001)).success).toBe(false);
   });
 });

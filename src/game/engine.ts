@@ -21,6 +21,8 @@ export type GameResult =
 // Holds the squad: server-only, never serialized
 export type GameState = {
   readonly mode: GameMode;
+  // R14: solo with no clock, so no life is lost
+  readonly practice: boolean;
   readonly squad: readonly SquadEntry[];
   readonly lives: readonly number[];
   readonly found: readonly FoundPlayer[];
@@ -30,7 +32,7 @@ export type GameState = {
 };
 
 export type NewGame =
-  | { mode: 'solo'; squad: readonly SquadEntry[] }
+  | { mode: 'solo'; squad: readonly SquadEntry[]; practice?: boolean }
   | { mode: 'duel'; squad: readonly SquadEntry[]; firstSeat: Seat };
 
 export type GameInput =
@@ -61,6 +63,7 @@ export function createGame(game: NewGame): GameState {
   const isDuel = game.mode === 'duel';
   return {
     mode: game.mode,
+    practice: game.mode === 'solo' && game.practice === true,
     squad: game.squad,
     lives: isDuel ? [MAX_LIVES, MAX_LIVES] : [MAX_LIVES],
     found: [],
@@ -183,6 +186,7 @@ export function applyInput(state: GameState, input: GameInput): Step {
     case 'guess':
       return applyGuess(state, input.seat, input.text);
     case 'expire':
+      if (state.practice) return { rejected: 'wrong_mode' };
       return applyExpiry(state);
     case 'quit':
       return applyQuit(state);

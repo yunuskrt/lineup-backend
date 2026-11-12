@@ -59,6 +59,7 @@ describe('createGame', () => {
   it('starts solo on seat 0 with 3 lives', () => {
     expect(solo()).toEqual({
       mode: 'solo',
+      practice: false,
       squad: SQUAD,
       lives: [3],
       found: [],
@@ -313,6 +314,42 @@ describe('rejections', () => {
     });
     expect(applyInput(duel(), { kind: 'forfeit', seat: seat2 })).toEqual({
       rejected: 'unknown_seat',
+    });
+  });
+});
+
+describe('practice (R14)', () => {
+  const practice = () =>
+    createGame({ mode: 'solo', squad: SQUAD, practice: true });
+
+  it('is only ever solo', () => {
+    expect(practice().practice).toBe(true);
+    expect(solo().practice).toBe(false);
+    expect(duel().practice).toBe(false);
+  });
+
+  it('refuses an expiry, so no life is lost', () => {
+    expect(applyInput(practice(), EXPIRE)).toEqual({ rejected: 'wrong_mode' });
+  });
+
+  it('ends in a perfect clear with 3 lives on the 11th name', () => {
+    const state = play(
+      practice(),
+      NAMES.map((name) => guess(0, name)),
+    );
+    expect(state.result).toEqual({
+      mode: 'solo',
+      endReason: 'perfect_clear',
+      livesRemaining: 3,
+    });
+  });
+
+  it('ends on quit with 3 lives', () => {
+    const state = play(practice(), [guess(0, 'nobody'), { kind: 'quit' }]);
+    expect(state.result).toEqual({
+      mode: 'solo',
+      endReason: 'quit',
+      livesRemaining: 3,
     });
   });
 });

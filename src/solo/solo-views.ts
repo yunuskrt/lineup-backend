@@ -14,7 +14,7 @@ function foundOf(run: PlayedRun): RevealedPlayer[] {
 
 // The run's names, in order, with their times
 function namedOf(run: PlayedRun): NamedPlayer[] {
-  const named = namedOrder(run.firstRound, run.effects);
+  const named = namedOrder(run.firstRound, run.effects, run.practice);
   return timedFound(run.timed.game.found, named).map(
     ({ playerId, order, elapsedMs }) => ({
       ...revealOf(run.squad, playerId),
@@ -33,6 +33,7 @@ export function toSoloSession(run: PlayedRun): SoloSession {
     lives: game.lives[0],
     found: foundOf(run),
     round,
+    practice: run.practice,
   };
 }
 
@@ -52,6 +53,7 @@ export function toSoloSummary(run: PlayedRun, tier: Tier): SoloSummary {
     missed: tier === 'pro' ? missed : null,
     livesRemaining: result.livesRemaining,
     endReason: result.endReason,
-    ...runFigures(run.firstRound, run.effects),
+    ...runFigures(run.firstRound, run.effects, run.practice),
+    practice: run.practice,
   };
 }

@@ -1,3 +1,4 @@
+import { startRound } from '@/game/clock.js';
 import {
   applyTimed,
   createTimedGame,
@@ -18,13 +19,16 @@ export const guess = (text: string): TimedInput => ({
 });
 
 export function offeredRun(
-  overrides: Partial<Pick<OfferedRun, 'id' | 'userId' | 'touchedAt'>> = {},
+  overrides: Partial<
+    Pick<OfferedRun, 'id' | 'userId' | 'touchedAt' | 'practice'>
+  > = {},
 ): OfferedRun {
   return {
     id: 'run-1',
     userId: 'user-1',
     match: IDENTITY,
     touchedAt: T0,
+    practice: false,
     side: null,
     squad: null,
     timed: null,
@@ -34,15 +38,17 @@ export function offeredRun(
   };
 }
 
-// Each input lands at T0 + its offset
-export function playedRun(...inputs: [TimedInput, number][]): PlayedRun {
-  const start = createTimedGame({ mode: 'solo', squad: SQUAD.entries }, T0);
+function runOf(practice: boolean, inputs: [TimedInput, number][]): PlayedRun {
+  const start = createTimedGame(
+    { mode: 'solo', squad: SQUAD.entries, practice },
+    T0,
+  );
   let run: PlayedRun = {
-    ...offeredRun(),
+    ...offeredRun({ practice }),
     side: 'home',
     squad: SQUAD,
     timed: start,
-    firstRound: start.round!,
+    firstRound: start.round ?? startRound(T0),
     effects: [],
     savedAt: null,
   };
@@ -56,4 +62,13 @@ export function playedRun(...inputs: [TimedInput, number][]): PlayedRun {
     };
   }
   return run;
+}
+
+// Each input lands at T0 + its offset
+export function playedRun(...inputs: [TimedInput, number][]): PlayedRun {
+  return runOf(false, inputs);
+}
+
+export function practiceRun(...inputs: [TimedInput, number][]): PlayedRun {
+  return runOf(true, inputs);
 }

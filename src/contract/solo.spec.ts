@@ -18,6 +18,7 @@ const session = {
   lives: 3,
   found: [revealedPlayer],
   round: roundTiming,
+  practice: false,
 };
 
 const { side: _side, formation: _formation, ...matchIdentity } = matchInPlay;
@@ -32,6 +33,7 @@ const summary = {
   accuracy: 0.25,
   bestStreak: 1,
   roundTimesMs: [4_200, 15_000],
+  practice: false,
 };
 
 describe('soloSessionSchema', () => {
@@ -114,12 +116,17 @@ describe('soloSummarySchema found timings', () => {
   it.each([
     ['order 0', 0, 1_000],
     ['order 12', 12, 1_000],
-    ['a time past the round', 1, 15_001],
     ['a negative time', 1, -1],
+    ['a fractional time', 1, 1.5],
   ])('refuses %s', (_, order, elapsedMs) => {
     expect(soloSummarySchema.safeParse(named(order, elapsedMs)).success).toBe(
       false,
     );
+  });
+
+  it('takes a practice time past the round (R14)', () => {
+    const practice = { ...named(1, 15_001), practice: true };
+    expect(soloSummarySchema.safeParse(practice).success).toBe(true);
   });
 
   it('refuses a found player with no timing', () => {
@@ -160,5 +167,38 @@ describe('soloStartRequestSchema (R13)', () => {
     expect(filtersSchema.parse({ ...FILTERS, matchId: 'm-1' })).toEqual(
       FILTERS,
     );
+  });
+});
+
+describe('practice (R14)', () => {
+  const FILTERS = {
+    competitionIds: [],
+    clubIds: [],
+    era: { from: 2000, to: 2025 },
+  };
+
+  it('is optional on the start body and combines with matchId', () => {
+    const body = { ...FILTERS, matchId: 'm-1', practice: true };
+    expect(soloStartRequestSchema.parse(body)).toEqual(body);
+    expect(soloStartRequestSchema.parse(FILTERS)).not.toHaveProperty(
+      'practice',
+    );
+    expect(
+      soloStartRequestSchema.safeParse({ ...FILTERS, practice: 'yes' }).success,
+    ).toBe(false);
+  });
+
+  it('is required on the session and the summary', () => {
+    const { practice: _s, ...noSessionFlag } = session;
+    const { practice: _m, ...noSummaryFlag } = summary;
+    expect(soloSessionSchema.safeParse(noSessionFlag).success).toBe(false);
+    expect(soloSummarySchema.safeParse(noSummaryFlag).success).toBe(false);
+  });
+
+  it('accepts a practice session with no round', () => {
+    expect(
+      soloSessionSchema.safeParse({ ...session, round: null, practice: true })
+        .success,
+    ).toBe(true);
   });
 });

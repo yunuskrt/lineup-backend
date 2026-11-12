@@ -47,8 +47,12 @@ const namedTimingShape = {
   elapsedMs: z.number().int().min(0).max(ROUND_MS),
 };
 
+// R14: practice has no round, so no cap
 export const namedPlayerSchema = revealedPlayerSchema
-  .extend(namedTimingShape)
+  .extend({
+    ...namedTimingShape,
+    elapsedMs: z.number().int().nonnegative(),
+  })
   .register(contractRegistry, { id: 'NamedPlayer' });
 export type NamedPlayer = z.infer<typeof namedPlayerSchema>;
 

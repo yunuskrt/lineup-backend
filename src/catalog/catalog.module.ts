@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ArchiveService } from '@/catalog/archive.service.js';
 import { CatalogController } from '@/catalog/catalog.controller.js';
 import { CatalogService } from '@/catalog/catalog.service.js';
 import { PlayerDirectoryService } from '@/catalog/player-directory.service.js';
@@ -8,6 +9,11 @@ import { MatchesModule } from '@/matches/matches.module.js';
 @Module({
   imports: [MatchesModule],
   controllers: [CatalogController],
-  providers: [CatalogService, PlayerDirectoryService, SYSTEM_CLOCK],
+  providers: [
+    ArchiveService,
+    CatalogService,
+    PlayerDirectoryService,
+    SYSTEM_CLOCK,
+  ],
 })
 export class CatalogModule {}

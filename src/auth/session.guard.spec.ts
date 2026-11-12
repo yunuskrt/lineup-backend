@@ -5,9 +5,11 @@ import {
   currentUserFrom,
   type RequestWithUser,
 } from '@/auth/current-user.decorator.js';
+import { ProGated } from '@/auth/pro-gated.decorator.js';
 import { IS_PUBLIC, Public } from '@/auth/public.decorator.js';
 import { SessionGuard } from '@/auth/session.guard.js';
 import { ApiException, SERVER_ERROR_MESSAGE } from '@/common/api-exception.js';
+import type { Env } from '@/config/env.schema.js';
 import type { User } from '@/contract/auth.js';
 
 const GUEST: User = {
@@ -18,10 +20,14 @@ const GUEST: User = {
   tier: 'free',
 };
 
+const PRO_ONLY = 'That needs Pro.';
+
 class Routes {
   guarded(this: void) {}
   @Public()
   open(this: void) {}
+  @ProGated(PRO_ONLY)
+  pro(this: void) {}
 }
 
 @Public()
@@ -48,9 +54,13 @@ function httpContext(
 
 describe('SessionGuard', () => {
   const getSession = vi.fn();
-  const guard = new SessionGuard(new Reflector(), {
-    getSession,
-  } as unknown as AuthFlowService);
+  const guardWith = (proEnabled: boolean) =>
+    new SessionGuard(
+      new Reflector(),
+      { getSession } as unknown as AuthFlowService,
+      { PRO_ENABLED: proEnabled } as Env,
+    );
+  const guard = guardWith(true);
 
   beforeEach(() => {
     getSession.mockReset();
@@ -143,6 +153,60 @@ describe('SessionGuard', () => {
 
     await expect(guard.canActivate(context)).rejects.toMatchObject({
       error: { code: 'server_error' },
+    });
+  });
+
+  describe('@ProGated (R12)', () => {
+    const PRO: User = { ...GUEST, tier: 'pro' };
+
+    it('is public while the switch is off', async () => {
+      const { context, req } = httpContext(Routes.prototype.pro, Routes);
+
+      expect(await guardWith(false).canActivate(context)).toBe(true);
+      expect(getSession).not.toHaveBeenCalled();
+      expect(req.currentUser).toBeUndefined();
+    });
+
+    it('needs a session while the switch is on', async () => {
+      getSession.mockResolvedValue({ data: null, cookies: [] });
+      const { context } = httpContext(Routes.prototype.pro, Routes);
+
+      await expect(guard.canActivate(context)).rejects.toMatchObject({
+        error: { code: 'unauthorized' },
+      });
+    });
+
+    it('refuses Free with pro_required and the message', async () => {
+      getSession.mockResolvedValue({ data: { user: GUEST }, cookies: [] });
+      const { context, req } = httpContext(Routes.prototype.pro, Routes);
+
+      const error = await guard.canActivate(context).catch((e: unknown) => e);
+
+      expect(error).toMatchObject({
+        status: 403,
+        error: {
+          code: 'forbidden',
+          message: PRO_ONLY,
+          retryAfterMs: null,
+          reason: 'pro_required',
+        },
+      });
+      expect(req.currentUser).toBeUndefined();
+    });
+
+    it('lets Pro through with the user attached', async () => {
+      getSession.mockResolvedValue({ data: { user: PRO }, cookies: [] });
+      const { context, req } = httpContext(Routes.prototype.pro, Routes);
+
+      expect(await guard.canActivate(context)).toBe(true);
+      expect(req.currentUser).toEqual(PRO);
+    });
+
+    it('never gates a plain guarded route on the tier', async () => {
+      getSession.mockResolvedValue({ data: { user: GUEST }, cookies: [] });
+      const { context } = httpContext(Routes.prototype.guarded, Routes);
+
+      expect(await guard.canActivate(context)).toBe(true);
     });
   });
 

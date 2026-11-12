@@ -1,4 +1,6 @@
 import {
+  archivePageSchema,
+  archiveQuerySchema,
   catalogOverviewSchema,
   directoryPlayerSchema,
   playerDirectorySchema,
@@ -136,5 +138,48 @@ describe('catalogOverviewSchema', () => {
   it('strips a field outside the contract', () => {
     const parsed = catalogOverviewSchema.parse({ ...OVERVIEW, score: 99 });
     expect(parsed).not.toHaveProperty('score');
+  });
+});
+
+describe('archiveQuerySchema (R12)', () => {
+  it('coerces query-string text and defaults the limit', () => {
+    expect(
+      archiveQuerySchema.parse({ q: '  milan ', from: '2004', to: '2005' }),
+    ).toEqual({ q: 'milan', from: 2004, to: 2005, limit: 20 });
+  });
+
+  it.each([
+    ['an empty q', { q: '   ' }],
+    ['a long q', { q: 'x'.repeat(65) }],
+    ['a season before the era', { from: '1999' }],
+    ['a season after the era', { to: '2026' }],
+    ['from after to', { from: '2010', to: '2005' }],
+    ['a limit over 50', { limit: '51' }],
+    ['a limit of 0', { limit: '0' }],
+    ['a cursor with odd characters', { cursor: 'a+b/c=' }],
+  ])('refuses %s', (_, input) => {
+    expect(archiveQuerySchema.safeParse(input).success).toBe(false);
+  });
+
+  it('takes one bound alone', () => {
+    expect(archiveQuerySchema.parse({ to: '2000' })).toMatchObject({
+      to: 2000,
+    });
+  });
+});
+
+describe('archivePageSchema (R12)', () => {
+  it('takes a page with a null cursor', () => {
+    expect(
+      archivePageSchema.safeParse({ entries: [], nextCursor: null, total: 0 })
+        .success,
+    ).toBe(true);
+  });
+
+  it('refuses a negative total', () => {
+    expect(
+      archivePageSchema.safeParse({ entries: [], nextCursor: null, total: -1 })
+        .success,
+    ).toBe(false);
   });
 });

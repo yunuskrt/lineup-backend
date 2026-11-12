@@ -19,6 +19,9 @@ export const LAST_SEASON_START = 2025;
 
 export const TOP_CLUBS_LIMIT = 12;
 
+export const DEFAULT_ARCHIVE_LIMIT = 20;
+export const MAX_ARCHIVE_LIMIT = 50;
+
 // R11: Free solo runs per UTC day
 export const SOLO_DAILY_RUNS = 5;
 

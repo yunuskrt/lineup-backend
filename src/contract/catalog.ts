@@ -1,10 +1,20 @@
 import { z } from 'zod';
-import { idSchema, imageUrlSchema } from '@/contract/common.js';
-import { SQUAD_SIZE, TOP_CLUBS_LIMIT } from '@/contract/constants.js';
+import {
+  guessTextSchema,
+  idSchema,
+  imageUrlSchema,
+} from '@/contract/common.js';
+import {
+  DEFAULT_ARCHIVE_LIMIT,
+  MAX_ARCHIVE_LIMIT,
+  SQUAD_SIZE,
+  TOP_CLUBS_LIMIT,
+} from '@/contract/constants.js';
 import {
   clubRefSchema,
   competitionRefSchema,
   eraRangeSchema,
+  matchIdentitySchema,
   matchInPlaySchema,
   seasonStartSchema,
 } from '@/contract/match.js';
@@ -124,3 +134,40 @@ export const catalogOverviewSchema = z
   })
   .register(contractRegistry, { id: 'CatalogOverview' });
 export type CatalogOverview = z.infer<typeof catalogOverviewSchema>;
+
+// R12: query-string text, so values are coerced
+export const archiveQuerySchema = z
+  .object({
+    q: guessTextSchema.optional(),
+    competitionId: idSchema.optional(),
+    clubId: idSchema.optional(),
+    from: z.coerce.number().pipe(seasonStartSchema).optional(),
+    to: z.coerce.number().pipe(seasonStartSchema).optional(),
+    // Opaque: base64url from the previous page
+    cursor: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,200}$/)
+      .optional(),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_ARCHIVE_LIMIT)
+      .default(DEFAULT_ARCHIVE_LIMIT),
+  })
+  .refine(
+    ({ from, to }) => from === undefined || to === undefined || from <= to,
+    { error: 'from must not be after to', path: ['from'] },
+  )
+  .register(contractRegistry, { id: 'ArchiveQuery' });
+export type ArchiveQuery = z.infer<typeof archiveQuerySchema>;
+
+// Newest first; no lineup, no score (HC 2, 20)
+export const archivePageSchema = z
+  .object({
+    entries: z.array(matchIdentitySchema).max(MAX_ARCHIVE_LIMIT),
+    nextCursor: z.string().min(1).nullable(),
+    total: z.number().int().nonnegative(),
+  })
+  .register(contractRegistry, { id: 'ArchivePage' });
+export type ArchivePage = z.infer<typeof archivePageSchema>;

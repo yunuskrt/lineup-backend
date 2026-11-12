@@ -67,3 +67,4 @@ Not Started
 - R9 Pro Tier & Switch: users.tier, PRO_ENABLED, GET /config, reason
 - R10 Room Hosting Gate: room:create needs Pro, fresh tier read, join open
 - R11 Solo Daily Cap: 5 Free runs a UTC day, in-memory count, /allowance
+- R12 Match Archive: GET /catalog/matches, in-memory word search, @ProGated

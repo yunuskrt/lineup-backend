@@ -217,6 +217,7 @@ Paths are suggestions. Every response body is the envelope from §2, wrapping th
 | 17 | `catalog.getOverview` | `GET /catalog/overview` | — | `CatalogOverview` (R7). Public: no session needed |
 | 18 | `config.getConfig` | `GET /config` | — | `AppConfig` (R9). Public: no session needed |
 | 19 | `solo.getAllowance` | `GET /solo/allowance` | — | `SoloAllowance` (R11) |
+| 20 | `catalog.getArchive` | `GET /catalog/matches?q=&competitionId=&clubId=&from=&to=&cursor=&limit=` | `ArchiveQuery` | `ArchivePage` (R12). Pro while `PRO_ENABLED` is on; public while it's off |
 
 Better Auth (B10) mounts its own routes. Calls 1–6 may map onto them rather than onto these paths; the web only needs the shapes.
 
@@ -229,6 +230,7 @@ Better Auth (B10) mounts its own routes. Calls 1–6 may map onto them rather th
 | `UpgradeGuestRequest` | same as `SignUpRequest` |
 | `SoloGuessRequest` | `sessionId` (id), `guess` (trimmed, 1–64 chars) |
 | `HistoryQuery` | `cursor` (id or `null`), `limit` (integer 1–50; web default 20) |
+| `ArchiveQuery` (R12) | All optional: `q` (trimmed, 1–64 chars), `competitionId` (id), `clubId` (id, either side), `from` and `to` (season starts 2000–2025, `from ≤ to`), `cursor` (opaque, from `nextCursor`), `limit` (integer 1–50, default 20) |
 
 The web only checks password **length**. The backend owns the password policy.
 
@@ -316,6 +318,19 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | Field | Type | Rule |
 | --- | --- | --- |
 | `proEnabled` | boolean | The backend's `PRO_ENABLED`. `false`: every user and guest is Pro, and no Pro wording or lock should show. `true`: `User.tier` is each user's own. For display only: it grants nothing |
+
+**`ArchivePage`** (R12) = `{ entries: MatchIdentity[], nextCursor: string | null, total: number }`. Every match the selector can serve (both gates; the showcase match never), so each entry is one exact match selection (R13) accepts.
+
+| Rule | Detail |
+| --- | --- |
+| Access | `PRO_ENABLED` on: a session with `User.tier` `pro`; Free gets `forbidden`, `reason: 'pro_required'`, "Browsing the match archive needs Pro."; no session gets `unauthorized`. `PRO_ENABLED` off: public, no session needed |
+| Order | Newest first by `date`, then by id. Never by memorability score |
+| `total` | Every match the query matches, across all pages |
+| Paging | Pass `nextCursor` back as `cursor`; `null` on the last page. No repeats or gaps. A cursor that isn't one of ours is `invalid_input` |
+| `q` | Normalized as guesses are (diacritics, Turkish letters, case), then split into words. **Every word must be the start of a word** in the match's text: both clubs' names, short names and aliases, the competition, the nickname, the season (`2004-05` also reads as `2004` and `2005`) and the match's year. "milan 2005" and "istanbul" both work; "barc" finds Barcelona; "ter" doesn't find Inter |
+| Never sent | Lineups, players, sides, formations, memorability scores |
+| Freshness | The server keeps its index 5 minutes |
+| Rate limit | `catalog` (60 a minute) |
 
 **`SoloAllowance`** (R11). Today's solo runs, for "N of 5 solo runs left today". Any session, guests included; `default` rate limit.
 
@@ -409,6 +424,7 @@ CORS allows `If-None-Match` and exposes `ETag`, so a client can revalidate throu
 | `getOverview` | `rate_limited` + `retryAfterMs` |
 | `getConfig` | `rate_limited` + `retryAfterMs` |
 | `getAllowance` | `unauthorized` |
+| `getArchive` | `invalid_input` (bad query or cursor), `rate_limited` + `retryAfterMs`; with `PRO_ENABLED` on, `unauthorized` and `forbidden` + `reason: 'pro_required'` |
 | Any | `server_error` |
 
 ### Solo behaviour the web relies on

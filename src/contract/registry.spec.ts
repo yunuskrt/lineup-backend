@@ -45,6 +45,8 @@ describe('contractRegistry', () => {
         'AppConfig',
         'ForbiddenReason',
         'SoloAllowance',
+        'ArchiveQuery',
+        'ArchivePage',
       ]),
     );
   });
